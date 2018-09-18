@@ -24,7 +24,7 @@ from estnltk.corpus_processing.parse_koondkorpus import parse_tei_corpus_file_co
 
 from estnltk.storage.postgres import PostgresStorage
 
-def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=False):
+def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True):
     """ Traverses recursively root_dir to find XML TEI documents,
         converts found documents to EstNLTK Text objects, and 
         yields created Text objects.
@@ -43,7 +43,7 @@ def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=False):
             which content has been removed from the XML file. Depending on 
             the goals of the analysis, the caption may still be useful, 
             so, by default, empty documents are preserved;
-            (default: False)
+            (default: True)
     """
     for dirpath, dirnames, filenames in os.walk(root_dir):
         if len(dirnames) > 0 or len(filenames) == 0 or 'bin' in dirpath:
@@ -62,7 +62,7 @@ def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=False):
 
 
 
-def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=False):
+def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=True):
     """ Finds zipped (.zip and tar.gz) files from the directory root_dir, 
         unpacks XML TEI documents from zipped files, converts documents 
         to EstNLTK Text objects, and yields created Text objects.
@@ -81,7 +81,7 @@ def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=False):
             which content has been removed from the XML file. Depending on 
             the goals of the analysis, the caption may still be useful, 
             so, by default, empty documents are preserved;
-            (default: False)
+            (default: True)
     """
     files = os.listdir( root_dir )
     for in_file in files:
@@ -100,7 +100,7 @@ def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=False):
 
 
 def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
-                  create_empty_docs=False):
+                  create_empty_docs=False, logger=None):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir
     
@@ -120,10 +120,6 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
         create_empty_docs: boolean
             If True, then documents are also created if there is no 
             textual content, but only metadata content.
-            Note: an empty document may be a captioned table or a figure, 
-            which content has been removed from the XML file. Depending on 
-            the goals of the analysis, the caption may still be useful, 
-            so, by default, empty documents are preserved;
             (default: False)
     """
     assert doc_iterator in [iter_unpacked_xml, iter_packed_xml]
@@ -140,7 +136,8 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             else:
                meta[key] = doc.meta[key] if key in doc.meta else ''
         row_id = collection.insert(doc, meta_data=meta)
-        log.info(' Document #{} inserted.'.format(row_id))
+        if logger:
+            logger.info(' Document #{} inserted.'.format(row_id))
         #print('.', end = '')
         #sys.stdout.flush()
     print()
@@ -216,8 +213,8 @@ if __name__ == '__main__':
     
     startTime = datetime.now()
     process_files(args.rootdir, doc_iterator, collection, encoding=args.encoding, \
-                  create_empty_docs=False)
+                  create_empty_docs=False, logger = log)
     storage.close()
     time_diff = datetime.now() - startTime
-    print('Total processing time: {}'.format(time_diff))
+    log.info('Total processing time: {}'.format(time_diff))
        
