@@ -16,6 +16,13 @@ from collections import OrderedDict
 from datetime import datetime
 from datetime import timedelta
 
+from nltk.tokenize.simple import LineTokenizer
+from estnltk.taggers import SentenceTokenizer
+from estnltk.taggers.text_segmentation.whitespace_tokens_tagger \
+                     import WhiteSpaceTokensTagger
+from estnltk.taggers.text_segmentation.pretokenized_text_compound_tokens_tagger \
+                     import PretokenizedTextCompoundTokensTagger
+
 from estnltk.corpus_processing.parse_koondkorpus import get_div_target
 from estnltk.corpus_processing.parse_koondkorpus import get_text_subcorpus_name
 from estnltk.corpus_processing.parse_koondkorpus import parse_tei_corpus
@@ -99,8 +106,43 @@ def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=True):
                    yield doc
 
 
+
+def init_preserving_sentence_tokenizer():
+    """ Initializes SentenceTokenizer that splits into sentences 
+        only by newlines (uses LineTokenizer), and uses no
+        additional post-corrections.
+        This SentenceTokenizer can be used for restoring the 
+        original tokenization in the text from XML file.
+    
+    Returns
+    -------
+    SentenceTokenizer
+        SentenceTokenizer that splits into sentences only by 
+        newlines (uses LineTokenizer), and uses no additional 
+        post-corrections;
+    """
+    return SentenceTokenizer(
+           base_sentence_tokenizer=LineTokenizer(),
+           fix_paragraph_endings = True,
+           fix_compound_tokens = False,
+           fix_numeric = False,
+           fix_parentheses = False,
+           fix_double_quotes = False,
+           fix_inner_title_punct = False,
+           fix_repeated_ending_punct = False,
+           use_emoticons_as_endings = False )
+
+
+
+# Special tokenstagger, compoundtokentagger and sentence_tokenizer 
+# used by the function process_files
+special_tokens_tagger          = None
+special_compound_tokens_tagger = None
+special_sentence_tokenizer     = None
+
+
 def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
-                  create_empty_docs=False, logger=None):
+                  create_empty_docs=False, logger=None, tokenization=None):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir
     
@@ -122,13 +164,46 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             textual content, but only metadata content.
             (default: False)
     """
+    global special_tokens_tagger
+    global special_compound_tokens_tagger
+    global special_sentence_tokenizer
     assert doc_iterator in [iter_unpacked_xml, iter_packed_xml]
+    assert tokenization in [None, 'none', 'preserve', 'estnltk']
+    if tokenization:
+        if tokenization == 'none':
+           tokenization = None
+        elif tokenization == 'preserve' and not special_tokens_tagger:
+           # Initialize special taggers
+           special_tokens_tagger = \
+                 WhiteSpaceTokensTagger()
+           special_compound_tokens_tagger = \
+                 PretokenizedTextCompoundTokensTagger()
+           special_sentence_tokenizer = \
+                 init_preserving_sentence_tokenizer()
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs):
+        if tokenization:
+           # add tokenization (if required)
+           if tokenization == 'preserve':
+               # a) preserve original tokenization
+               # Tag 'tokens' and 'words' that follow exactly the 
+               # tokenization in the XML file
+               # (note: 'compound_tokens' will be always empty)
+               special_tokens_tagger.tag(doc)
+               special_compound_tokens_tagger.tag(doc)
+               doc.tag_layer(['words'])
+               # Tag 'sentences' and 'paragraphs' that follow 
+               # exactly the annotation in XML files
+               special_sentence_tokenizer.tag(doc)
+               doc.tag_layer(['paragraphs'])
+           elif tokenization == 'estnltk':
+               # b) use estnltk's tokenization instead
+               doc.tag_layer(['tokens', 'compound_tokens', 'words'])
+               doc.tag_layer(['sentences', 'paragraphs'])
         if '_xml_file' in doc.meta:
+           # record subcorpus name
            subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc )
            doc.meta['subcorpus'] = subcorpus
-        doc.tag_layer(['tokens', 'compound_tokens', 'words'])
-        doc.tag_layer(['sentences', 'paragraphs'])
+        # Collect metadata
         meta = {}
         for key in ['file', 'subcorpus', 'title', 'type']:
             if key == 'file':
@@ -141,6 +216,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
         #print('.', end = '')
         #sys.stdout.flush()
     print()
+
 
 
 if __name__ == '__main__':
@@ -174,11 +250,18 @@ if __name__ == '__main__':
     parser.add_argument('--role', dest='role', action='store',
                         help='collection owner (default: None)')
     # 3) Processing parameters 
-    #    (TODO)
+    parser.add_argument('-t', '--tokenization', dest='tokenization', \
+                        help='specifies if and how texts will be tokenized. none -- no tokenization will '+ \
+                             'be applied; preserve -- original tokenization from XML files will be preserved; '+\
+                             'estnltk -- original tokenization from XML files will be overwritten by '+\
+                             "estnltk's tokenization; "+\
+                              "(default: preserve)",\
+                        choices=['none', 'preserve', 'estnltk'], \
+                        default='preserve' )
     # 4) Logging parameters
-    parser.add_argument('--logging', dest='logging', action='store', default='INFO',\
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],\
-                        help='logging level (default: INFO)')
+    parser.add_argument('--logging', dest='logging', action='store', default='info',\
+                        choices=['debug', 'info', 'warning', 'error', 'critical'],\
+                        help='logging level (default: info)')
     args = parser.parse_args()
 
     if not os.path.isdir(args.rootdir):
@@ -191,7 +274,7 @@ if __name__ == '__main__':
        doc_iterator = iter_unpacked_xml
     if not doc_iterator:
        raise Exception('(!) No iterator implemented for the input format',args.input_format)
-    logging.basicConfig(level=args.logging)
+    logging.basicConfig( level=(args.logging).upper() )
     log = logging.getLogger(__name__)
     
     storage = PostgresStorage(pgpass_file=args.pgpass,
@@ -213,7 +296,7 @@ if __name__ == '__main__':
     
     startTime = datetime.now()
     process_files(args.rootdir, doc_iterator, collection, encoding=args.encoding, \
-                  create_empty_docs=False, logger = log)
+                  create_empty_docs=False, logger=log, tokenization=args.tokenization)
     storage.close()
     time_diff = datetime.now() - startTime
     log.info('Total processing time: {}'.format(time_diff))
