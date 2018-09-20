@@ -8,7 +8,7 @@ estnltk-workflows$ estnltk_workflows/postgres_collections/data_export/export_to_
 If the Text objects contain the `morph_analysis` layer, then `words`, `lemmas` and `partofspeech` data is included.
 
 To include TEXTA facts a csv file containing fact mapping instructions is needed.
-See the example file [fact_mapping_example.csv]().
+See the example file [fact_mapping_example.csv](fact_mapping_example.csv).
 
 For options display help:
 ```bash
