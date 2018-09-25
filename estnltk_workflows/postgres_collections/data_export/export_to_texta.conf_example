@@ -1,0 +1,11 @@
+--input-layers=measurement_tokens
+--fact-mapping=estnltk_workflows/postgres_collections/data_export/fact_mapping_example.csv
+--sessionpass=~/.staccpass
+--pgpass=~/.pgpass
+--textaurl=http://localhost:8000
+--textapass=~/.textapass
+--textaindex=public
+--textamapping=collection
+--schema=public
+--collection=collection
+--logging=INFO

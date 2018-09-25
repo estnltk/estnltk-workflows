@@ -15,3 +15,7 @@ For options display help:
 estnltk-workflows$ estnltk_workflows/postgres_collections/data_export/export_to_texta -h
 ```
 
+Options can be saved in a config fail:
+```bash
+estnltk-workflows$ estnltk_workflows/postgres_collections/data_export/export_to_texta @estnltk_workflows/postgres_collections/data_export/export_to_texta.conf_example
+```
