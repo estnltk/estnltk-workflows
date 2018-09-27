@@ -99,6 +99,8 @@ with storage.conn as conn:
         total = c.fetchone()[0]
 
     with conn.cursor('read') as read_cursor:
+        # by the documentation named cursor fetches itersize records at time from the backend reducing overhead
+        conn.autocommit = False
         read_cursor.execute(SQL('SELECT {}, {} FROM {}.{}').format(Identifier(source_id_column),
                                                                    Identifier(source_text_column),
                                                                    Identifier(source_schema),
@@ -129,3 +131,5 @@ with storage.conn as conn:
             for fragment, para_nr, sent_nr in split(text):
                 meta = {'source_id': source_id, 'para_nr': para_nr, 'sent_nr': sent_nr}
                 collection_id = collection.insert(fragment, meta_data=meta)
+
+        read_cursor.autocommit = True
