@@ -18,6 +18,7 @@ from collections import OrderedDict
 from datetime import datetime
 from datetime import timedelta
 
+from estnltk.layer_operations import split_by
 
 from estnltk.corpus_processing.parse_koondkorpus import get_div_target
 from estnltk.corpus_processing.parse_koondkorpus import get_text_subcorpus_name
@@ -169,10 +170,35 @@ def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
                    yield doc
 
 
+#
+# The following iterator functions borrow from Paul's source at:
+#      .../estnltk_workflows/postgres_collections/data_import/create_collection.py
+#
+
+# function that keeps the original text without splitting
+def to_text(text):
+    yield text, None, None
+
+# function that splits the original text into paragraphs
+def to_paragraphs(text):
+    for para_nr, para in enumerate(split_by(text, layer='paragraphs',
+                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences'])):
+        yield para, para_nr, None
+
+# function that splits the original text into sentences
+def to_sentences(text):
+    sent_nr = 0
+    for para_nr, para in enumerate(split_by(text, layer='paragraphs',
+                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences'])):
+        for sent in split_by(para, layer='sentences', layers_to_keep=['tokens', 'compound_tokens', 'words']):
+            sent_nr += 1
+            yield sent, para_nr, sent_nr
+
 
 def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                   create_empty_docs=False, logger=None, tokenization=None,\
-                  force_sentence_end_newlines=False):
+                  force_sentence_end_newlines=False, splittype='no_splitting',\
+                  metadata_extent='complete'):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
@@ -197,8 +223,8 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
         logger: logging.Logger
             Logger used for debugging messages;
         tokenization: ['none', 'preserve', 'estnltk']
-            if tokenization will be added to Texts, and if so, then 
-            how it will be added. 
+            specifies if tokenization will be added to Texts, and if 
+            so, then how it will be added. 
             * 'none'     -- text   will   be   created  without  any 
                             tokenization layers;
             * 'preserve' -- original tokenization from XML files will 
@@ -211,12 +237,28 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             be marked with newlines in the text string, regardless 
             the tokenization option used.
             (default: False)
+        splittype: ['no_splitting', 'sentences', 'paragraphs']
+            specifies if and how texts should be split before inserting
+            into the database:
+            * 'no_splitting' -- insert full texts, do no split;
+            * 'sentences'    -- split into sentences (a Text object 
+                                for each sentence), and insert 
+                                sentences into database;
+            * 'paragraphs'   -- split into paragraphs (a Text object 
+                                for each paragraph), and insert 
+                                paragraphs into database;
+        metadata_extent: ['minimal', 'complete']
+            specifies to which extent created Text object should be 
+            populated with metadata. 
+            (default: 'complete')
     """
     global special_tokens_tagger
     global special_compound_tokens_tagger
     global special_sentence_tokenizer
     assert doc_iterator in [iter_unpacked_xml, iter_packed_xml]
     assert tokenization in [None, 'none', 'preserve', 'estnltk']
+    assert splittype in ['no_splitting', 'sentences', 'paragraphs']
+    assert metadata_extent in ['minimal', 'complete']
     add_tokenization      = False
     preserve_tokenization = False
     sentence_separator    = ' '
@@ -233,29 +275,57 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
            preserve_tokenization = False
     if force_sentence_end_newlines:
         sentence_separator = '\n'
+    # Choose how the loaded document will be 
+    # split before the insertion
+    split = to_text
+    if args.splittype == 'no_splitting':
+        split = to_text
+    elif args.splittype == 'sentences':
+       split = to_sentences
+    elif args.splittype == 'paragraphs':
+       split = to_paragraphs
+    doc_id = 0
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                             sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
-        if '_xml_file' in doc.meta:
-           # record subcorpus name
-           subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
-           doc.meta['subcorpus'] = subcorpus
-        # Collect metadata
-        meta = {}
-        for key in ['file', 'subcorpus', 'title', 'type']:
-            if key == 'file':
-               meta[key] = doc.meta['_xml_file'] if '_xml_file' in doc.meta else ''
-            else:
-               meta[key] = doc.meta[key] if key in doc.meta else ''
-        row_id = collection.insert(doc, meta_data=meta)
-        if logger:
-            # debugging stuff
-            with_layers = list(doc.layers.keys())
-            if with_layers:
-               with_layers = ' with layers '+str(with_layers)
-            else:
-               with_layers = ''
-            logger.debug((' Document #{}'+with_layers+' inserted.').format(row_id))
+        # Split the loaded document into smaller units if required
+        for doc_fragment, para_nr, sent_nr in split( doc ):
+            meta = {}
+            # Gather metadata
+            # 1) minimal metadata:
+            meta['file'] = doc.meta['_xml_file'] if '_xml_file' in doc.meta else ''
+            doc_fragment.meta['file'] = meta['file']
+            meta['document_nr'] = doc_id
+            doc_fragment.meta['doc_nr'] = doc_id
+            if para_nr is not None:
+               meta['paragraph_nr'] = para_nr
+               doc_fragment.meta['para_nr'] = para_nr
+            if sent_nr is not None:
+               meta['sentence_nr'] = sent_nr
+               doc_fragment.meta['sent_nr'] = sent_nr
+            # 2) complete metadata:
+            if metadata_extent == 'complete':
+               for key, value in doc.meta.items():
+                   doc_fragment.meta[key] = value
+               if '_xml_file' in doc.meta:
+                   # record subcorpus name
+                   subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
+                   doc_fragment.meta['subcorpus'] = subcorpus
+               # Collect remaining metadata
+               for key in ['subcorpus', 'title', 'type']:
+                   meta[key] = doc_fragment.meta[key] if key in doc_fragment.meta else ''
+            # Finally, insert document 
+            row_id = collection.insert(doc_fragment, meta_data=meta)
+            if logger:
+               # debugging stuff
+               with_layers = list(doc_fragment.layers.keys())
+               if with_layers:
+                  with_layers = ' with layers '+str(with_layers)
+               else:
+                  with_layers = ''
+               logger.debug((' Text #{}'+with_layers+' inserted.').format(row_id))
+               #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
+        doc_id += 1
         #print('.', end = '')
         #sys.stdout.flush()
     print()
@@ -333,6 +403,24 @@ if __name__ == '__main__':
                              "(default: none)",\
                         choices=['none', 'preserve', 'estnltk'], \
                         default='none' )
+    parser.add_argument('--splittype', dest='splittype', action='store',
+                        default='no_splitting', choices=['no_splitting', 'sentences', 'paragraphs'],
+                        help='specifies if and how the source texts should be split before\n'+
+                             'inserting into the database. Options:\n'+
+                             '\n'+
+                             '* no_splitting -- source texts will be inserted into the database\n'+\
+                             '  as a whole, without any splitting applied;\n'+\
+                             '\n'+
+                             '* paragraphs -- source texts will split into paragraphs (a Text object\n'+\
+                             '  will be created for each paragraph), and then inserted into the\n'+\
+                             '  database;\n'
+                             '\n'+
+                             '* sentences -- source texts will split into sentences (a Text object\n'+\
+                             '  will be created for each sentence), and then inserted into the\n'+\
+                             '  database;\n'+\
+                             '(default: no_splitting)\n\n'
+                             '(!) Note: you can only use --splittype if tokenization is turned on!'
+                        )
     parser.add_argument('-f', '--force_sentence_end_newlines', dest='force_sentence_end_newlines', \
                         default=False, \
                         action='store_true', \
@@ -345,6 +433,30 @@ if __name__ == '__main__':
                              " -t none, or -t estnltk.\n"+\
                              "(default: False)",\
                         )
+    parser.add_argument('-m', '--metadata_extent', dest='metadata_extent', \
+                        help='specifies to which extent created Text objects should be \n'+\
+                             'populated with metadata. Options:\n\n'
+                             ' * minimal -- minimal amount of metadata. Fields: \n'+\
+                             "      1. 'file'         -- the XML file name; \n"+\
+                             "      2. 'document_nr'  -- unique number for the document; \n"+\
+                             "      3. 'paragraph_nr' -- paragraph's number in the document\n"+\
+                             "          (if text was split into paragraphs or sentences);\n"+\
+                             "      4. 'sentence_nr'  -- sentence's number in the document\n"+\
+                             "          (if text was split into sentences);\n"+\
+                             '\n'+\
+                             ' * complete -- all metadata included. Fields: \n'+\
+                             "      1. 'file'         -- the XML file name; \n"+\
+                             "      2. 'document_nr'  -- unique number for the document; \n"+\
+                             "      3. 'paragraph_nr' -- paragraph's number in the document\n"+\
+                             "          (if text was split into paragraphs or sentences);\n"+\
+                             "      4. 'sentence_nr'  -- sentence's number in the document\n"+\
+                             "          (if text was split into sentences);\n"+\
+                             "      5. 'subcorpus'    -- short name of the subcorpus; \n"+\
+                             "      6. 'title'        -- title of the document (if available); \n"+\
+                             "      7. 'type'         -- type of the document (if available); \n"+\
+                             '(default: complete)',\
+                        choices=['minimal', 'complete'], \
+                        default='complete' )
     # 4) Logging parameters
     parser.add_argument('--logging', dest='logging', action='store', default='info',\
                         choices=['debug', 'info', 'warning', 'error', 'critical'],\
@@ -361,6 +473,9 @@ if __name__ == '__main__':
        doc_iterator = iter_unpacked_xml
     if not doc_iterator:
        raise Exception('(!) No iterator implemented for the input format',args.input_format)
+    if args.splittype != 'no_splitting':
+       if args.tokenization == 'none':
+          raise Exception('(!) splittype '+str(args.splittype)+' cannot be used without tokenization!')
     logging.basicConfig( level=(args.logging).upper() )
     log = logging.getLogger(__name__)
     
@@ -373,18 +488,34 @@ if __name__ == '__main__':
         collection.delete()
 
     if not collection.exists():
-         meta_fields = OrderedDict([('file', 'str'),
-                                    ('subcorpus', 'str'),
-                                    ('title', 'str'),
-                                    ('type', 'str')])
+         fields = [('file', 'str'),
+                   ('document_nr', 'bigint')]
+         if args.splittype == 'sentences':
+              fields.append( ('paragraph_nr', 'int') )
+              fields.append( ('sentence_nr', 'int') )
+         elif args.splittype == 'paragraphs':
+              fields.append( ('paragraph_nr', 'int') )
+         if args.metadata_extent == 'complete':
+              fields.append( ('subcorpus', 'str') )
+              fields.append( ('title', 'str') )
+              fields.append( ('type', 'str') )
+         meta_fields = OrderedDict( fields )
          collection = storage.get_collection(args.collection, meta_fields=meta_fields)
          collection.create('collection of estnltk texts with segmentation')
          log.info(' New collection {!r} created.'.format(args.collection))
     
+    if args.splittype == 'no_splitting':
+         log.info(' Source texts will not be splitted.')
+    elif args.splittype == 'sentences':
+         log.info(' Source texts will be splitted by sentences.')
+    elif args.splittype == 'paragraphs':
+         log.info(' Source texts will be splitted by paragraphs.')
+
     startTime = datetime.now()
     process_files(args.rootdir, doc_iterator, collection, encoding=args.encoding, \
                   create_empty_docs=False, logger=log, tokenization=args.tokenization,\
-                  force_sentence_end_newlines=args.force_sentence_end_newlines)
+                  force_sentence_end_newlines=args.force_sentence_end_newlines, \
+                  splittype=args.splittype, metadata_extent=args.metadata_extent)
     storage.close()
     time_diff = datetime.now() - startTime
     log.info('Total processing time: {}'.format(time_diff))
