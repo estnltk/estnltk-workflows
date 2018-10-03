@@ -182,14 +182,14 @@ def to_text(text):
 # function that splits the original text into paragraphs
 def to_paragraphs(text):
     for para_nr, para in enumerate(split_by(text, layer='paragraphs',
-                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences'])):
+                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences']), start=1):
         yield para, para_nr, None
 
 # function that splits the original text into sentences
 def to_sentences(text):
     sent_nr = 0
     for para_nr, para in enumerate(split_by(text, layer='paragraphs',
-                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences'])):
+                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences']), start=1):
         for sent in split_by(para, layer='sentences', layers_to_keep=['tokens', 'compound_tokens', 'words']):
             sent_nr += 1
             yield sent, para_nr, sent_nr
@@ -284,7 +284,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
        split = to_sentences
     elif args.splittype == 'paragraphs':
        split = to_paragraphs
-    doc_id = 0
+    doc_id = 1
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                             sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
@@ -295,9 +295,9 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             # 1) minimal metadata:
             meta['file'] = doc.meta['_xml_file'] if '_xml_file' in doc.meta else ''
             doc_fragment.meta['file'] = meta['file']
-            meta['document_nr'] = doc_id
-            doc_fragment.meta['doc_nr'] = doc_id
             if para_nr is not None:
+               meta['document_nr'] = doc_id
+               doc_fragment.meta['doc_nr'] = doc_id
                meta['paragraph_nr'] = para_nr
                doc_fragment.meta['para_nr'] = para_nr
             if sent_nr is not None:
@@ -336,7 +336,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
        "Loads Koondkorpus XML TEI files (either from zipped archives, or from directories where \n"+\
        "the files have been unpacked), creates EstNLTK Text objects based on these files, adds \n"+\
-       "tokenization to Texts (optional), and stores Texts in a PostgreSQL collection. \n"+\
+       "tokenization to Texts (optional), splits Texts into paragraphs or sentences (optional),\n"+\
+       "and stores Texts in a PostgreSQL collection.\n"+\
        "Note: If the given collection already exists, it will be deleted, and a new collection \n"+\
        "will be created for storing Texts.",\
        formatter_class=RawTextHelpFormatter
@@ -408,8 +409,8 @@ if __name__ == '__main__':
                         help='specifies if and how the source texts should be split before\n'+
                              'inserting into the database. Options:\n'+
                              '\n'+
-                             '* no_splitting -- source texts will be inserted into the database\n'+\
-                             '  as a whole, without any splitting applied;\n'+\
+                             '* no_splitting -- each source text will be inserted into the database\n'+\
+                             '  as whole, without any splitting applied;\n'+\
                              '\n'+
                              '* paragraphs -- source texts will split into paragraphs (a Text object\n'+\
                              '  will be created for each paragraph), and then inserted into the\n'+\
@@ -439,6 +440,7 @@ if __name__ == '__main__':
                              ' * minimal -- minimal amount of metadata. Fields: \n'+\
                              "      1. 'file'         -- the XML file name; \n"+\
                              "      2. 'document_nr'  -- unique number for the document; \n"+\
+                             "          (if text was split into paragraphs or sentences);\n"+\
                              "      3. 'paragraph_nr' -- paragraph's number in the document\n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
                              "      4. 'sentence_nr'  -- sentence's number in the document\n"+\
@@ -447,6 +449,7 @@ if __name__ == '__main__':
                              ' * complete -- all metadata included. Fields: \n'+\
                              "      1. 'file'         -- the XML file name; \n"+\
                              "      2. 'document_nr'  -- unique number for the document; \n"+\
+                             "          (if text was split into paragraphs or sentences);\n"+\
                              "      3. 'paragraph_nr' -- paragraph's number in the document\n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
                              "      4. 'sentence_nr'  -- sentence's number in the document\n"+\
@@ -488,12 +491,13 @@ if __name__ == '__main__':
         collection.delete()
 
     if not collection.exists():
-         fields = [('file', 'str'),
-                   ('document_nr', 'bigint')]
+         fields = [('file', 'str')]
          if args.splittype == 'sentences':
+              fields.append( ('document_nr', 'bigint') )
               fields.append( ('paragraph_nr', 'int') )
-              fields.append( ('sentence_nr', 'int') )
+              fields.append( ('sentence_nr', 'bigint') )
          elif args.splittype == 'paragraphs':
+              fields.append( ('document_nr', 'bigint') )
               fields.append( ('paragraph_nr', 'int') )
          if args.metadata_extent == 'complete':
               fields.append( ('subcorpus', 'str') )
