@@ -1,9 +1,8 @@
 #
 #   Loads Koondkorpus XML TEI files (either from zipped archives, or from directories where
 #  the files have been unpacked), creates EstNLTK Text objects based on these files, adds
-#  tokenization to Texts (optional), and stores Texts in a PostgreSQL collection.
-#   Note: If the given collection already exists, it will be deleted, and a new collection
-#  will be created for storing Texts.
+#  tokenization to Texts (optional), splits Texts into paragraphs or sentences (optional), 
+#  and stores Texts in a PostgreSQL collection.
 # 
 
 import os, sys
@@ -27,6 +26,7 @@ from estnltk.corpus_processing.parse_koondkorpus import unpack_zipped_xml_files_
 from estnltk.corpus_processing.parse_koondkorpus import parse_tei_corpus_file_content
 
 from estnltk.storage.postgres import PostgresStorage
+from psycopg2.sql import SQL, Identifier
 
 def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
                      add_tokenization=False, \
@@ -346,14 +346,40 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
 
 
 
+def fetch_column_names( storage, schema, collection ):
+    """ Finds and returns a list of column names of an existing PostgreSQL
+        storage.
+    
+        Parameters
+        ----------
+        storage: PostgresStorage
+            PostgresStorage to be queried for column names of the collection;
+        schema: str
+            Name of the schema;
+        collection: boolean
+            Name of the collection / db table;
+            
+        Returns
+        -------
+        list of str
+            List of column names in given collection;
+    """
+    colnames = None
+    with storage.conn as conn:
+         with conn.cursor() as c:
+              c.execute(SQL('SELECT * FROM {}.{} LIMIT 0').format(Identifier(schema),
+                                                                  Identifier(collection)))
+              colnames = [desc[0] for desc in c.description]
+    return colnames
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
        "Loads Koondkorpus XML TEI files (either from zipped archives, or from directories where \n"+\
        "the files have been unpacked), creates EstNLTK Text objects based on these files, adds \n"+\
        "tokenization to Texts (optional), splits Texts into paragraphs or sentences (optional),\n"+\
-       "and stores Texts in a PostgreSQL collection.\n"+\
-       "Note: If the given collection already exists, it will be deleted, and a new collection \n"+\
-       "will be created for storing Texts.",\
+       "and stores Texts in a PostgreSQL collection.\n",\
        formatter_class=RawTextHelpFormatter
     )
     # 1) Input parameters
@@ -388,6 +414,8 @@ if __name__ == '__main__':
                         help='name of the collection (default: collection)')
     parser.add_argument('--role', dest='role', action='store',
                         help='collection owner (default: None)')
+    parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
+                        help='required if the collection already exists')
     # 3) Processing parameters 
     parser.add_argument('-t', '--tokenization', dest='tokenization', \
                         help='specifies if and how texts will be reconstructed and tokenized: \n\n'+ \
@@ -497,30 +525,56 @@ if __name__ == '__main__':
     logging.basicConfig( level=(args.logging).upper() )
     log = logging.getLogger(__name__)
     
+    # Collect required database meta fields
+    fields = [ ('subcorpus', 'str') ]
+    fields.append( ('file', 'str') )
+    if args.splittype == 'sentences':
+         fields.append( ('document_nr', 'bigint') )
+         fields.append( ('paragraph_nr', 'int') )
+         fields.append( ('sentence_nr', 'bigint') )
+    elif args.splittype == 'paragraphs':
+         fields.append( ('document_nr', 'bigint') )
+         fields.append( ('paragraph_nr', 'int') )
+    if args.metadata_extent == 'complete':
+         fields.append( ('title', 'str') )
+         fields.append( ('type', 'str') )
+    meta_fields = OrderedDict( fields )
+    
+    # Connect with the storage
     storage = PostgresStorage(pgpass_file=args.pgpass,
                               schema=args.schema,
                               role=args.role)
-    collection = storage.get_collection(args.collection)
+    collection = storage.get_collection(args.collection, meta_fields=meta_fields)
     if collection.exists():
-        log.info(' Collection {!r} exists. Overwriting.'.format(args.collection))
-        collection.delete()
+        if args.mode is None:
+             log.error(' (!) Collection {!r} already exists, use --mode {{overwrite,append}}.'.format(args.collection))
+             exit(1)
+        if args.mode == 'overwrite':
+             log.info(' Collection {!r} exists. Overwriting.'.format(args.collection))
+             collection.delete()
+        elif args.mode == 'append':
+             # A small sanity check before appending: existing meta fields of the table 
+             # should match with newly specified meta fields
+             # Note: even if the check will be passed, this still does not assure 100% 
+             # that we use exactly the same configuration, e.g. 
+             #   two executions of the script may use different approaches for tokenization;
+             existing_columns = fetch_column_names( storage, args.schema, args.collection )
+             new_columns = ['id', 'data'] + [ name for (name, type) in meta_fields.items() ]
+             if existing_columns != new_columns:
+                  msg = ' (!) Existing collection {!r} has columns {}, but the new insertions are for columns {}. '
+                  msg += 'Please re-check command line arguments to provide right configuration for insertions.'
+                  log.error( msg.format(args.collection, existing_columns, new_columns))
+                  exit(1)
+             log.info('Collection {!r} exists. Appending.'.format(args.collection))
 
     if not collection.exists():
-         fields = [ ('subcorpus', 'str') ]
-         fields.append( ('file', 'str') )
-         if args.splittype == 'sentences':
-              fields.append( ('document_nr', 'bigint') )
-              fields.append( ('paragraph_nr', 'int') )
-              fields.append( ('sentence_nr', 'bigint') )
-         elif args.splittype == 'paragraphs':
-              fields.append( ('document_nr', 'bigint') )
-              fields.append( ('paragraph_nr', 'int') )
-         if args.metadata_extent == 'complete':
-              fields.append( ('title', 'str') )
-              fields.append( ('type', 'str') )
-         meta_fields = OrderedDict( fields )
          collection = storage.get_collection(args.collection, meta_fields=meta_fields)
-         collection.create('collection of estnltk texts with segmentation')
+         tokenization_desc = ''
+         if args.tokenization_desc == 'preserve':
+             tokenization_desc = ' with original segmentation'
+         elif args.tokenization_desc == 'estnltk':
+             tokenization_desc = ' with segmentation'
+         collection.create('collection of estnltk texts'+tokenization_desc)
          log.info(' New collection {!r} created.'.format(args.collection))
     
     if args.splittype == 'no_splitting':
