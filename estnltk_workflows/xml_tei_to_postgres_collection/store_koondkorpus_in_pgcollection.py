@@ -295,7 +295,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
        split = to_paragraphs
     last_xml_file = ''
     doc_id = 1
-    total_insertions = 0
+    total_insertions    = 0
+    xml_files_processed = 0
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                             sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
@@ -361,11 +362,14 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                logger.debug((' {} inserted as Text #{}{}.').format(file_chunk_str, row_id, with_layers))
                #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
         doc_nr += 1
-        last_xml_file = doc.meta.get('_xml_file', '')
+        if last_xml_file != xml_file:
+            xml_files_processed += 1
+        last_xml_file = xml_file
         #print('.', end = '')
         #sys.stdout.flush()
     if logger:
-        logger.info('{} estnltk texts inserted into the database'.format(total_insertions))
+        logger.info('Total {} XML files processed.'.format(xml_files_processed))
+        logger.info('Total {} estnltk texts inserted into the database.'.format(total_insertions))
 
 
 
@@ -461,8 +465,8 @@ if __name__ == '__main__':
                              'File names in the text file should be separated by newlines.\n\n'+\
                              'Use this argument to specify a subset of XML files to be processed\n'+\
                              'while parallelizing the process. \n'+\
-                             'You can use the script "split_large_corpus_files_into_subsets.py"\n'+\
-                             'to split the input corpus (either packed or unpacked) into subsets \n'+\
+                             'You can use the script "split_corpus_files_into_subsets.py" to\n'+\
+                             'split the input corpus (either packed or unpacked) into subsets\n'+\
                              'of XML files.')
     parser.add_argument('-t', '--tokenization', dest='tokenization', \
                         help='specifies if and how texts will be reconstructed and tokenized: \n\n'+ \
