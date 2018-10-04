@@ -331,13 +331,13 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                   file_chunk_lst.append(':')
                   file_chunk_lst.append(str(meta['sentence_nr']))
                file_chunk_str = ''.join( file_chunk_lst )
-               # b) Listing of annotations layers added to Text
+               # b) Listing of annotation layers added to Text
                with_layers = list(doc_fragment.layers.keys())
                if with_layers:
                   with_layers = ' with layers '+str(with_layers)
                else:
                   with_layers = ''
-               logger.debug((' {} inserted as Text #{}'+with_layers+'.').format(file_chunk_str, row_id))
+               logger.debug((' {} inserted as Text #{}{}.').format(file_chunk_str, row_id, with_layers))
                #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
         doc_id += 1
         #print('.', end = '')
