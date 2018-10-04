@@ -28,6 +28,7 @@ from estnltk.corpus_processing.parse_koondkorpus import parse_tei_corpus_file_co
 from estnltk.storage.postgres import PostgresStorage
 from psycopg2.sql import SQL, Identifier
 
+
 def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
                      add_tokenization=False, \
                      preserve_tokenization=False, \
@@ -284,6 +285,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
        split = to_sentences
     elif args.splittype == 'paragraphs':
        split = to_paragraphs
+    last_xml_file = ''
     doc_id = 1
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
@@ -292,18 +294,21 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
         subcorpus = ''
         if '_xml_file' in doc.meta:
             subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
+        # Reset the document counter if we have a new file coming up
+        if last_xml_file != doc.meta.get('_xml_file', ''):
+            doc_nr = 1
         # Split the loaded document into smaller units if required
         for doc_fragment, para_nr, sent_nr in split( doc ):
             meta = {}
             # Gather metadata
             # 1) minimal metadata:
-            meta['file'] = doc.meta['_xml_file'] if '_xml_file' in doc.meta else ''
+            meta['file'] = doc.meta.get('_xml_file', '')
             doc_fragment.meta['file'] = meta['file']
             doc_fragment.meta['subcorpus'] = subcorpus
             meta['subcorpus'] = subcorpus
             if para_nr is not None:
-               meta['document_nr'] = doc_id
-               doc_fragment.meta['doc_nr'] = doc_id
+               meta['document_nr'] = doc_nr
+               doc_fragment.meta['doc_nr'] = doc_nr
                meta['paragraph_nr'] = para_nr
                doc_fragment.meta['para_nr'] = para_nr
             if sent_nr is not None:
@@ -315,7 +320,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                    doc_fragment.meta[key] = value
                # Collect remaining metadata
                for key in ['title', 'type']:
-                   meta[key] = doc_fragment.meta[key] if key in doc_fragment.meta else ''
+                   meta[key] = doc_fragment.meta.get(key, '')
             # Finally, insert document 
             row_id = collection.insert(doc_fragment, meta_data=meta)
             if logger:
@@ -323,7 +328,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                # a) Description of the XML file/subdocument/paragraph/sentence
                file_chunk_lst = [meta['file']]
                file_chunk_lst.append(':')
-               file_chunk_lst.append(str(doc_id))
+               file_chunk_lst.append(str(doc_nr))
                if 'paragraph_nr' in meta:
                   file_chunk_lst.append(':')
                   file_chunk_lst.append(str(meta['paragraph_nr']))
@@ -339,7 +344,9 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                   with_layers = ''
                logger.debug((' {} inserted as Text #{}{}.').format(file_chunk_str, row_id, with_layers))
                #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
-        doc_id += 1
+        doc_nr += 1
+        last_xml_file = doc.meta.get('_xml_file', '')
+        
         #print('.', end = '')
         #sys.stdout.flush()
     print()
@@ -482,7 +489,7 @@ if __name__ == '__main__':
                              ' * minimal -- minimal amount of metadata. Fields: \n'+\
                              "      1. 'subcorpus'    -- short name of the subcorpus; \n"+\
                              "      2. 'file'         -- the XML file name; \n"+\
-                             "      3. 'document_nr'  -- unique number for the document; \n"+\
+                             "      3. 'document_nr'  -- number of document in the file; \n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
                              "      4. 'paragraph_nr' -- paragraph's number in the document\n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
@@ -492,7 +499,7 @@ if __name__ == '__main__':
                              ' * complete -- all metadata included. Fields: \n'+\
                              "      1. 'subcorpus'    -- short name of the subcorpus; \n"+\
                              "      2. 'file'         -- the XML file name; \n"+\
-                             "      3. 'document_nr'  -- unique number for the document; \n"+\
+                             "      3. 'document_nr'  -- number of document in the file; \n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
                              "      4. 'paragraph_nr' -- paragraph's number in the document\n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
@@ -570,9 +577,9 @@ if __name__ == '__main__':
     if not collection.exists():
          collection = storage.get_collection(args.collection, meta_fields=meta_fields)
          tokenization_desc = ''
-         if args.tokenization_desc == 'preserve':
+         if args.tokenization == 'preserve':
              tokenization_desc = ' with original segmentation'
-         elif args.tokenization_desc == 'estnltk':
+         elif args.tokenization == 'estnltk':
              tokenization_desc = ' with segmentation'
          collection.create('collection of estnltk texts'+tokenization_desc)
          log.info(' New collection {!r} created.'.format(args.collection))
