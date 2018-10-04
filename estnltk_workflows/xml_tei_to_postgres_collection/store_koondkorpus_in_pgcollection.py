@@ -320,12 +320,24 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             row_id = collection.insert(doc_fragment, meta_data=meta)
             if logger:
                # debugging stuff
+               # a) Description of the XML file/subdocument/paragraph/sentence
+               file_chunk_lst = [meta['file']]
+               file_chunk_lst.append(':')
+               file_chunk_lst.append(str(doc_id))
+               if 'paragraph_nr' in meta:
+                  file_chunk_lst.append(':')
+                  file_chunk_lst.append(str(meta['paragraph_nr']))
+               if 'sentence_nr' in meta:
+                  file_chunk_lst.append(':')
+                  file_chunk_lst.append(str(meta['sentence_nr']))
+               file_chunk_str = ''.join( file_chunk_lst )
+               # b) Listing of annotations layers added to Text
                with_layers = list(doc_fragment.layers.keys())
                if with_layers:
                   with_layers = ' with layers '+str(with_layers)
                else:
                   with_layers = ''
-               logger.debug((' Text #{}'+with_layers+' inserted.').format(row_id))
+               logger.debug((' {} inserted as Text #{}'+with_layers+'.').format(file_chunk_str, row_id))
                #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
         doc_id += 1
         #print('.', end = '')
