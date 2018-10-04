@@ -288,6 +288,10 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                             sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
+        # Get subcorpus name
+        subcorpus = ''
+        if '_xml_file' in doc.meta:
+            subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
         # Split the loaded document into smaller units if required
         for doc_fragment, para_nr, sent_nr in split( doc ):
             meta = {}
@@ -295,6 +299,8 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             # 1) minimal metadata:
             meta['file'] = doc.meta['_xml_file'] if '_xml_file' in doc.meta else ''
             doc_fragment.meta['file'] = meta['file']
+            doc_fragment.meta['subcorpus'] = subcorpus
+            meta['subcorpus'] = subcorpus
             if para_nr is not None:
                meta['document_nr'] = doc_id
                doc_fragment.meta['doc_nr'] = doc_id
@@ -307,12 +313,8 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             if metadata_extent == 'complete':
                for key, value in doc.meta.items():
                    doc_fragment.meta[key] = value
-               if '_xml_file' in doc.meta:
-                   # record subcorpus name
-                   subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
-                   doc_fragment.meta['subcorpus'] = subcorpus
                # Collect remaining metadata
-               for key in ['subcorpus', 'title', 'type']:
+               for key in ['title', 'type']:
                    meta[key] = doc_fragment.meta[key] if key in doc_fragment.meta else ''
             # Finally, insert document 
             row_id = collection.insert(doc_fragment, meta_data=meta)
@@ -438,23 +440,24 @@ if __name__ == '__main__':
                         help='specifies to which extent created Text objects should be \n'+\
                              'populated with metadata. Options:\n\n'
                              ' * minimal -- minimal amount of metadata. Fields: \n'+\
-                             "      1. 'file'         -- the XML file name; \n"+\
-                             "      2. 'document_nr'  -- unique number for the document; \n"+\
+                             "      1. 'subcorpus'    -- short name of the subcorpus; \n"+\
+                             "      2. 'file'         -- the XML file name; \n"+\
+                             "      3. 'document_nr'  -- unique number for the document; \n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
-                             "      3. 'paragraph_nr' -- paragraph's number in the document\n"+\
+                             "      4. 'paragraph_nr' -- paragraph's number in the document\n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
-                             "      4. 'sentence_nr'  -- sentence's number in the document\n"+\
+                             "      5. 'sentence_nr'  -- sentence's number in the document\n"+\
                              "          (if text was split into sentences);\n"+\
                              '\n'+\
                              ' * complete -- all metadata included. Fields: \n'+\
-                             "      1. 'file'         -- the XML file name; \n"+\
-                             "      2. 'document_nr'  -- unique number for the document; \n"+\
+                             "      1. 'subcorpus'    -- short name of the subcorpus; \n"+\
+                             "      2. 'file'         -- the XML file name; \n"+\
+                             "      3. 'document_nr'  -- unique number for the document; \n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
-                             "      3. 'paragraph_nr' -- paragraph's number in the document\n"+\
+                             "      4. 'paragraph_nr' -- paragraph's number in the document\n"+\
                              "          (if text was split into paragraphs or sentences);\n"+\
-                             "      4. 'sentence_nr'  -- sentence's number in the document\n"+\
+                             "      5. 'sentence_nr'  -- sentence's number in the document\n"+\
                              "          (if text was split into sentences);\n"+\
-                             "      5. 'subcorpus'    -- short name of the subcorpus; \n"+\
                              "      6. 'title'        -- title of the document (if available); \n"+\
                              "      7. 'type'         -- type of the document (if available); \n"+\
                              '(default: complete)',\
@@ -491,7 +494,8 @@ if __name__ == '__main__':
         collection.delete()
 
     if not collection.exists():
-         fields = [('file', 'str')]
+         fields = [ ('subcorpus', 'str') ]
+         fields.append( ('file', 'str') )
          if args.splittype == 'sentences':
               fields.append( ('document_nr', 'bigint') )
               fields.append( ('paragraph_nr', 'int') )
@@ -500,7 +504,6 @@ if __name__ == '__main__':
               fields.append( ('document_nr', 'bigint') )
               fields.append( ('paragraph_nr', 'int') )
          if args.metadata_extent == 'complete':
-              fields.append( ('subcorpus', 'str') )
               fields.append( ('title', 'str') )
               fields.append( ('type', 'str') )
          meta_fields = OrderedDict( fields )
