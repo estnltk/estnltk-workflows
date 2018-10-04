@@ -196,10 +196,10 @@ def to_sentences(text):
             yield sent, para_nr, sent_nr
 
 
-def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
-                  create_empty_docs=False, logger=None, tokenization=None,\
-                  force_sentence_end_newlines=False, splittype='no_splitting',\
-                  metadata_extent='complete'):
+def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
+                  encoding='utf-8', create_empty_docs=False, logger=None, \
+                  tokenization=None, force_sentence_end_newlines=False, \
+                  splittype='no_splitting', metadata_extent='complete'):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
@@ -215,6 +215,13 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
         collection:  estnltk.storage.postgres.db.PgCollection
             EstNLTK's PgCollection where extracted Texts should be 
             stored;
+        focus_input_files: list of str
+            List of input XML files that should be exclusively
+            processed from root_dir. If provided, then only files
+            from the list will be processed, and all other files 
+            will be skipped.
+            If None, then all files returned by doc_iterator will
+            be processed.
         encoding: str
             Encoding of the XML files. (default: 'utf-8')
         create_empty_docs: boolean
@@ -253,6 +260,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
             populated with metadata. 
             (default: 'complete')
     """
+    
     global special_tokens_tagger
     global special_compound_tokens_tagger
     global special_sentence_tokenizer
@@ -287,6 +295,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
        split = to_paragraphs
     last_xml_file = ''
     doc_id = 1
+    total_insertions = 0
     for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                             sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
@@ -295,14 +304,20 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
         if '_xml_file' in doc.meta:
             subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
         # Reset the document counter if we have a new file coming up
-        if last_xml_file != doc.meta.get('_xml_file', ''):
+        xml_file = doc.meta.get('_xml_file', '')
+        if last_xml_file != xml_file:
             doc_nr = 1
+        # Check if we should load or skip the input file
+        if focus_input_files != None:
+            if xml_file not in focus_input_files:
+               # Skip the XML file if it is not listed
+               continue
         # Split the loaded document into smaller units if required
         for doc_fragment, para_nr, sent_nr in split( doc ):
             meta = {}
             # Gather metadata
             # 1) minimal metadata:
-            meta['file'] = doc.meta.get('_xml_file', '')
+            meta['file'] = xml_file
             doc_fragment.meta['file'] = meta['file']
             doc_fragment.meta['subcorpus'] = subcorpus
             meta['subcorpus'] = subcorpus
@@ -323,6 +338,7 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                    meta[key] = doc_fragment.meta.get(key, '')
             # Finally, insert document 
             row_id = collection.insert(doc_fragment, meta_data=meta)
+            total_insertions += 1
             if logger:
                # debugging stuff
                # a) Description of the XML file/subdocument/paragraph/sentence
@@ -346,10 +362,10 @@ def process_files(rootdir, doc_iterator, collection, encoding='utf-8', \
                #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
         doc_nr += 1
         last_xml_file = doc.meta.get('_xml_file', '')
-        
         #print('.', end = '')
         #sys.stdout.flush()
-    print()
+    if logger:
+        logger.info('{} estnltk texts inserted into the database'.format(total_insertions))
 
 
 
@@ -378,6 +394,20 @@ def fetch_column_names( storage, schema, collection ):
                                                                   Identifier(collection)))
               colnames = [desc[0] for desc in c.description]
     return colnames
+
+
+
+def load_in_file_names( fnm ):
+    ''' Loads names of the input XML files from a text file. 
+        Each name should be on a separate line.
+    '''
+    filenames = []
+    with open(fnm, 'r', encoding='utf-8') as f:
+       for line in f:
+           line = line.strip()
+           if len( line ) > 0:
+              filenames.append( line )
+    return filenames
 
 
 
@@ -424,6 +454,16 @@ if __name__ == '__main__':
     parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
                         help='required if the collection already exists')
     # 3) Processing parameters 
+    parser.add_argument('--in_files', dest='in_files', default = None, \
+                        help='specifies a text file containing names of the input XML files\n'+\
+                             '(files from rootdir) that should be processed. All other files\n'+\
+                             'in rootdir will be skipped.\n\n'+\
+                             'File names in the text file should be separated by newlines.\n\n'+\
+                             'Use this argument to specify a subset of XML files to be processed\n'+\
+                             'while parallelizing the process. \n'+\
+                             'You can use the script "split_large_corpus_files_into_subsets.py"\n'+\
+                             'to split the input corpus (either packed or unpacked) into subsets \n'+\
+                             'of XML files.')
     parser.add_argument('-t', '--tokenization', dest='tokenization', \
                         help='specifies if and how texts will be reconstructed and tokenized: \n\n'+ \
                              '* none -- the text string will be reconstructed by joining words \n'+\
@@ -442,7 +482,6 @@ if __name__ == '__main__':
                              '    compounding;\n'+\
                              "    Note #3: the layer 'tokens' will be equal to the layer 'words';"+\
                              '  \n\n'+\
-
                              '* estnltk -- the text string will be reconstructed by joining words \n'+\
                              '  and sentences from the original XML mark-up by spaces, and \n'+\
                              "  paragraphs by double newlines. Tokenization layers will be created \n"+\
@@ -532,6 +571,15 @@ if __name__ == '__main__':
     logging.basicConfig( level=(args.logging).upper() )
     log = logging.getLogger(__name__)
     
+    # List of input XML files (if selective processing is used)
+    focus_input_files = None
+    if args.in_files:
+       if not os.path.isfile(args.in_files):
+          raise Exception('(!) Unable to load list of input file names from file: '+str(args.in_files)+'!')
+       else:
+          focus_input_files = load_in_file_names( args.in_files )
+          log.info('Using XML files listed in {!r} and processing only {} files from {!r}.'.format(args.in_files, len(focus_input_files), args.rootdir) )
+    
     # Collect required database meta fields
     fields = [ ('subcorpus', 'str') ]
     fields.append( ('file', 'str') )
@@ -595,7 +643,8 @@ if __name__ == '__main__':
     process_files(args.rootdir, doc_iterator, collection, encoding=args.encoding, \
                   create_empty_docs=False, logger=log, tokenization=args.tokenization,\
                   force_sentence_end_newlines=args.force_sentence_end_newlines, \
-                  splittype=args.splittype, metadata_extent=args.metadata_extent)
+                  splittype=args.splittype, metadata_extent=args.metadata_extent, \
+                  focus_input_files=focus_input_files)
     storage.close()
     time_diff = datetime.now() - startTime
     log.info('Total processing time: {}'.format(time_diff))
