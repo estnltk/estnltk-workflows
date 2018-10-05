@@ -215,10 +215,10 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
         collection:  estnltk.storage.postgres.db.PgCollection
             EstNLTK's PgCollection where extracted Texts should be 
             stored;
-        focus_input_files: list of str
-            List of input XML files that should be exclusively
+        focus_input_files: set of str
+            Set of input XML files that should be exclusively
             processed from root_dir. If provided, then only files
-            from the list will be processed, and all other files 
+            from the set will be processed, and all other files 
             will be skipped.
             If None, then all files returned by doc_iterator will
             be processed.
@@ -403,14 +403,15 @@ def fetch_column_names( storage, schema, collection ):
 
 def load_in_file_names( fnm ):
     ''' Loads names of the input XML files from a text file. 
-        Each name should be on a separate line.
+        In the text file, each name should be on a separate line.
+        Returns a set of file names.
     '''
-    filenames = []
+    filenames = set()
     with open(fnm, 'r', encoding='utf-8') as f:
        for line in f:
            line = line.strip()
            if len( line ) > 0:
-              filenames.append( line )
+              filenames.add( line )
     return filenames
 
 
