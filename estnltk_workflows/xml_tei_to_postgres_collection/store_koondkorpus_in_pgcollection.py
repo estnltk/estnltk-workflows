@@ -29,11 +29,12 @@ from estnltk.storage.postgres import PostgresStorage
 from psycopg2.sql import SQL, Identifier
 
 
-def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
-                     add_tokenization=False, \
-                     preserve_tokenization=False, \
-                     sentence_separator='\n', \
-                     paragraph_separator='\n\n' ):
+def iter_unpacked_xml(root_dir, focus_input_files=None, \
+                      encoding='utf-8', create_empty_docs=True,\
+                      add_tokenization=False, \
+                      preserve_tokenization=False, \
+                      sentence_separator='\n', \
+                      paragraph_separator='\n\n' ):
     """ Traverses recursively root_dir to find XML TEI documents,
         converts found documents to EstNLTK Text objects, and 
         yields created Text objects.
@@ -43,6 +44,11 @@ def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
         root_dir: str
             The root directory which is recursively traversed to find 
             XML files;
+        focus_input_files: set of str
+            Set of input XML files that should be exclusively processed 
+            from root_dir. If provided, then only files from the set 
+            will be processed, and all other files will be skipped.
+            If None, then all files in root_dir will be processed.
         encoding: str
             Encoding of the XML files. (default: 'utf-8')
         create_empty_docs: boolean
@@ -83,6 +89,10 @@ def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
         if len(dirnames) > 0 or len(filenames) == 0 or 'bin' in dirpath:
             continue
         for fnm in filenames:
+            if focus_input_files != None:
+                if fnm not in focus_input_files:
+                   # Skip the XML file if it is not listed
+                   continue
             full_fnm = os.path.join(dirpath, fnm)
             target   = get_div_target(full_fnm)
             docs = parse_tei_corpus(full_fnm, target=[target], encoding=encoding, \
@@ -100,7 +110,8 @@ def iter_unpacked_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
 
 log = None
 
-def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
+def iter_packed_xml(root_dir, focus_input_files=None, encoding='utf-8', \
+                     create_empty_docs=True, \
                      add_tokenization=False, \
                      preserve_tokenization=False, \
                      sentence_separator='\n', \
@@ -114,6 +125,11 @@ def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
         root_dir: str
             The root directory which contains zipped (.zip and tar.gz) 
             XML TEI files;
+        focus_input_files: set of str
+            Set of input XML files that should be exclusively processed 
+            from root_dir. If provided, then only files from the set 
+            will be processed, and all other files will be skipped.
+            If None, then all files in root_dir will be processed.
         encoding: str
             Encoding of the XML files. (default: 'utf-8')
         create_empty_docs: boolean
@@ -156,6 +172,11 @@ def iter_packed_xml(root_dir, encoding='utf-8', create_empty_docs=True,\
         if in_file.endswith('.zip') or in_file.endswith('.gz'):
            in_path = os.path.join(root_dir, in_file)
            for (full_fnm, content) in unpack_zipped_xml_files_iterator(in_path,test_only=False):
+               if focus_input_files != None:
+                   path_head, path_tail = os.path.split(full_fnm)
+                   if path_tail not in focus_input_files:
+                       # Skip the XML file if it is not listed
+                       continue
                div_target = get_div_target(full_fnm)
                #log.debug('Loading '+full_fnm+' with '+div_target)
                docs = parse_tei_corpus_file_content(content, full_fnm, target=[div_target],\
@@ -297,7 +318,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     doc_id = 1
     total_insertions    = 0
     xml_files_processed = 0
-    for doc in doc_iterator(rootdir, encoding=encoding, create_empty_docs=create_empty_docs, \
+    for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
+                            create_empty_docs=create_empty_docs, \
                             add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                             sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
         # Get subcorpus name
@@ -308,11 +330,6 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
         xml_file = doc.meta.get('_xml_file', '')
         if last_xml_file != xml_file:
             doc_nr = 1
-        # Check if we should load or skip the input file
-        if focus_input_files != None:
-            if xml_file not in focus_input_files:
-               # Skip the XML file if it is not listed
-               continue
         # Split the loaded document into smaller units if required
         for doc_fragment, para_nr, sent_nr in split( doc ):
             meta = {}
