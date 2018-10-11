@@ -33,15 +33,16 @@ parser.add_argument('--source_table', dest='source_table', action='store',
 parser.add_argument('--source_id', dest='source_id', action='store',
                     default='id',
                     help='name of the unique id column of the source table (default: id)')
-parser.add_argument('--source_text', dest='source_text', action='store',
-                    default='text',
-                    help='name of the plain text column of the source table (default: text)')
+parser.add_argument('--source_text', dest='source_text', action='store', nargs='?', default=None,
+                    help='name of the plain text column of the source table; '
+                         'exactly one of --source_text or --source_data must be given (default: None)')
 parser.add_argument('--source_data', dest='source_data', action='store', nargs='?', default=None,
-                    help='name of the column with EstNltk Text objects in EstNltk json format of the source table '
-                         '(default: None)')
-parser.add_argument('--source_columns', dest='source_columns', action='store', nargs='*',
+                    help='name of the column of the source table that contains EstNltk Text objects '
+                         'in the EstNltk json format; '
+                         'exactly one of --source_text or --source_data must be given (default: None)')
+parser.add_argument('--source_columns', dest='source_columns', action='store', nargs='*', metavar='COLUMN_NAME',
                     help='names of the source columns to be copied into the collection table; '
-                         'can not include id, source_id, data, text, paragraph_nr, sentence_nr or start '
+                         'can not include id, data, source_id, start, text, paragraph_nr or sentence_nr '
                          '(default: None)')
 parser.add_argument('--logging', dest='logging', action='store', default='INFO',
                     choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
@@ -53,28 +54,36 @@ args = parser.parse_args()
 from collections import OrderedDict
 from psycopg2.sql import SQL, Identifier
 import tqdm
-from estnltk.storage.postgres import PostgresStorage
 from estnltk import Text
-from estnltk.layer_operations import split_by
 from estnltk import get_logger
+from estnltk.converters import dict_to_text
+from estnltk.storage.postgres import PostgresStorage
+from estnltk.layer_operations import split_by
 
 
 logger = get_logger(args.logging)
 
 schema = args.schema
-storage = PostgresStorage(dbname=args.database,
-                          pgpass_file=args.pgpass,
-                          schema=schema,
-                          role=args.role)
-
 source_schema = args.source_schema
 source_table = args.source_table
 source_id = args.source_id
 source_text_column = args.source_text
 source_columns = [c.strip() for c in args.source_columns]
+source_data = args.source_data
+
+if (source_text_column is None) is (source_data is None):
+    logger.error('exactly one of --source_text (given: {}) or --source_data (given: {}) expected'.format(
+                  source_text_column, source_data))
+    exit(1)
+
+storage = PostgresStorage(dbname=args.database,
+                          pgpass_file=args.pgpass,
+                          schema=schema,
+                          role=args.role)
 
 if not storage.table_exists(table=source_table, schema=source_schema):
-    raise ValueError('source does not exist: {}.{}'.format(source_schema, source_table))
+    logger.error('source does not exist: {}.{}'.format(source_schema, source_table))
+    exit(1)
 
 table_name = args.collection
 collection = storage.get_collection(table_name=table_name)
@@ -121,6 +130,17 @@ def to_sentences(text):
             yield sent, next(starts), paragraph_nr, sentence_nr
 
 
+split = to_text
+if args.splittype == 'no_splitting':
+    split = to_text
+    logger.info('Source texts will not be splitted.')
+elif args.splittype == 'sentences':
+    split = to_sentences
+    logger.info('Source texts will be splitted by sentences.')
+elif args.splittype == 'paragraphs':
+    split = to_paragraphs
+    logger.info('Source texts will be splitted by paragraphs.')
+
 with storage.conn as conn:
     with conn.cursor() as c:
         c.execute(SQL('SELECT count(*) FROM {}.{}').format(Identifier(source_schema),
@@ -128,36 +148,33 @@ with storage.conn as conn:
         total = c.fetchone()[0]
 
     conn.autocommit = False
-    commit_interval = 2000
     with conn.cursor('read', withhold=True) as read_cursor:
         # by the documentation named cursor fetches itersize records at time from the backend reducing overhead
-        read_cursor.execute(SQL('SELECT {}, {} FROM {}.{}').format(Identifier(source_id),
-                                                                   Identifier(source_text_column),
-                                                                   Identifier(source_schema),
-                                                                   Identifier(source_table)))
+
+        read_cursor.execute(SQL('SELECT {}, {} FROM {}.{}').format(
+                                                     Identifier(source_id),
+                                                     Identifier(source_text_column or source_data),
+                                                     Identifier(source_schema),
+                                                     Identifier(source_table))
+                            )
         iter_source = tqdm.tqdm(read_cursor,
                                 total=total,
                                 unit='doc',
                                 disable=args.logging not in {'DEBUG', 'INFO'})
 
-        split = to_text
-        if args.splittype == 'no_splitting':
-            split = to_text
-            logger.info('Source texts will not be splitted.')
-        elif args.splittype == 'sentences':
-            split = to_sentences
-            logger.info('Source texts will be splitted by sentences.')
-        elif args.splittype == 'paragraphs':
-            split = to_paragraphs
-            logger.info('Source texts will be splitted by paragraphs.')
-
+        commit_interval = 2000
         fragment_counter = 1
-        for s_id, source_text in iter_source:
+        for s_id, source in iter_source:
             iter_source.set_description('source_id: {}'.format(s_id))
-            text = Text(source_text).tag_layer(['morph_analysis', 'paragraphs'])
-            del text.tokens
-            logger.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
-                s_id, len(text.text), len(text.paragraphs), len(text.sentences)))
+
+            if source_data:
+                #logger.info(source)
+                text = dict_to_text(source)
+            else:
+                text = Text(source).tag_layer(['morph_analysis', 'paragraphs'])
+                del text.tokens
+                logger.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
+                    s_id, len(text.text), len(text.paragraphs), len(text.sentences)))
 
             for fragment, start, paragraph_nr, sentence_nr in split(text):
                 meta = {'source_id': s_id, 'start': start, 'paragraph_nr': paragraph_nr, 'sentence_nr': sentence_nr}
