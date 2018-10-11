@@ -3,7 +3,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Create a collection of estnltk texts '
                                              'with segmentation and morphology layers.',
-                                 epilog='Options can be abbreviated to a prefix.',
+                                 epilog='Options can be abbreviated to a prefix and stored in a @conf file.',
                                  fromfile_prefix_chars='@')
 
 parser.add_argument('--splittype', dest='splittype', action='store',
@@ -12,6 +12,8 @@ parser.add_argument('--splittype', dest='splittype', action='store',
 parser.add_argument('--pgpass', dest='pgpass', action='store',
                     default='~/.pgpass',
                     help='name of the PostgreSQL password file (default: ~/.pgpass)')
+parser.add_argument('--database', dest='database', action='store',
+                    help='name of the PostgreSQL database (default: first in the pgpass file)')
 parser.add_argument('--schema', dest='schema', action='store',
                     default='public',
                     help='name of the collection schema (default: public)')
@@ -19,16 +21,32 @@ parser.add_argument('--collection', dest='collection', action='store',
                     default='collection',
                     help='name of the collection (default: collection)')
 parser.add_argument('--role', dest='role', action='store',
-                    help='collection owner (default: None)')
+                    help='collection creator role (default: current user)')
 parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
                     help='required if the collection already exists')
-parser.add_argument('--source', dest='source', action='store', nargs=4, metavar=('SCHEMA', 'TABLE', 'ID', 'TEXT'),
-                    default=('public', 'texts', 'id', 'text'),
-                    help='schema of the source table, name of the source table, unique id column of the source table, '
-                         'plain text column of the source table (default: public, texts, id, text)')
+parser.add_argument('--source_schema', dest='source_schema', action='store',
+                    default='public',
+                    help='schema of the source table, (default: public)')
+parser.add_argument('--source_table', dest='source_table', action='store',
+                    default='texts',
+                    help='name of the source table, (default: texts)')
+parser.add_argument('--source_id', dest='source_id', action='store',
+                    default='id',
+                    help='name of the unique id column of the source table (default: id)')
+parser.add_argument('--source_text', dest='source_text', action='store',
+                    default='text',
+                    help='name of the plain text column of the source table (default: text)')
+parser.add_argument('--source_data', dest='source_data', action='store', nargs='?', default=None,
+                    help='name of the column with EstNltk Text objects in EstNltk json format of the source table '
+                         '(default: None)')
+parser.add_argument('--source_columns', dest='source_columns', action='store', nargs='*',
+                    help='names of the source columns to be copied into the collection table; '
+                         'can not include id, source_id, data, text, paragraph_nr, sentence_nr or start '
+                         '(default: None)')
 parser.add_argument('--logging', dest='logging', action='store', default='INFO',
                     choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                     help='logging level (default: INFO)')
+
 args = parser.parse_args()
 
 
@@ -38,58 +56,69 @@ import tqdm
 from estnltk.storage.postgres import PostgresStorage
 from estnltk import Text
 from estnltk.layer_operations import split_by
-from estnltk_workflows.logger import logger
-
-log = logger(args.logging, __name__)
+from estnltk import get_logger
 
 
-storage = PostgresStorage(pgpass_file=args.pgpass,
-                          schema=args.schema,
+logger = get_logger(args.logging)
+
+schema = args.schema
+storage = PostgresStorage(dbname=args.database,
+                          pgpass_file=args.pgpass,
+                          schema=schema,
                           role=args.role)
 
-source_schema, source_table, source_id_column, source_text_column = args.source
+source_schema = args.source_schema
+source_table = args.source_table
+source_id = args.source_id
+source_text_column = args.source_text
+source_columns = [c.strip() for c in args.source_columns]
+
 if not storage.table_exists(table=source_table, schema=source_schema):
     raise ValueError('source does not exist: {}.{}'.format(source_schema, source_table))
 
-collection = storage.get_collection(args.collection)
+table_name = args.collection
+collection = storage.get_collection(table_name=table_name)
 
 if collection.exists():
     if args.mode is None:
-        log.error('Collection {!r} already exists, use --mode {{overwrite,append}}.'.format(args.collection))
+        logger.error('Collection {!r} already exists, use --mode {{overwrite,append}}.'.format(table_name))
         exit(1)
     if args.mode == 'overwrite':
-        log.info('Collection {!r} exists. Overwriting.'.format(args.collection))
+        logger.info('Collection {!r} exists. Overwriting.'.format(table_name))
         collection.delete()
     elif args.mode == 'append':
-        log.info('Collection {!r} exists. Appending.'.format(args.collection))
+        logger.info('Collection {!r} exists. Appending.'.format(table_name))
 
 
 if not collection.exists():
     meta_fields = OrderedDict([('source_id', 'bigint'),
+                               ('start', 'int'),
                                ('paragraph_nr', 'int'),
                                ('sentence_nr', 'int')])
-    collection = storage.get_collection(args.collection, meta_fields=meta_fields)
+    collection = storage.get_collection(table_name, meta_fields=meta_fields)
     collection.create('collection of estnltk texts with segmentation and morphology layers')
-    log.info('New collection {!r} created.'.format(args.collection))
+    logger.info('New collection {!r} created.'.format(table_name))
 
 
 def to_text(text):
-    yield text, None, None
+    yield text, 0, None, None
 
 
 def to_paragraphs(text):
-    for para_nr, para in enumerate(split_by(text, layer='paragraphs',
+    starts = (s.start for s in text.paragraphs)
+    for paragraph_nr, para in enumerate(split_by(text, layer='paragraphs',
                                             layers_to_keep=['words', 'sentences', 'morph_analysis'])):
-        yield para, para_nr, None
+        yield para, next(starts), paragraph_nr, None
 
 
 def to_sentences(text):
-    sent_nr = 0
-    for para_nr, para in enumerate(split_by(text, layer='paragraphs',
+    starts = (s.start for s in text.sentences)
+    sentence_nr = 0
+    for paragraph_nr, para in enumerate(split_by(text, layer='paragraphs',
                                             layers_to_keep=['words', 'sentences', 'morph_analysis'])):
         for sent in split_by(para, layer='sentences', layers_to_keep=['words', 'morph_analysis']):
-            sent_nr += 1
-            yield sent, para_nr, sent_nr
+            sentence_nr += 1
+            yield sent, next(starts), paragraph_nr, sentence_nr
 
 
 with storage.conn as conn:
@@ -98,10 +127,11 @@ with storage.conn as conn:
                                                            Identifier(source_table)))
         total = c.fetchone()[0]
 
-    with conn.cursor('read') as read_cursor:
+    conn.autocommit = False
+    commit_interval = 2000
+    with conn.cursor('read', withhold=True) as read_cursor:
         # by the documentation named cursor fetches itersize records at time from the backend reducing overhead
-        conn.autocommit = False
-        read_cursor.execute(SQL('SELECT {}, {} FROM {}.{}').format(Identifier(source_id_column),
+        read_cursor.execute(SQL('SELECT {}, {} FROM {}.{}').format(Identifier(source_id),
                                                                    Identifier(source_text_column),
                                                                    Identifier(source_schema),
                                                                    Identifier(source_table)))
@@ -113,23 +143,62 @@ with storage.conn as conn:
         split = to_text
         if args.splittype == 'no_splitting':
             split = to_text
-            log.info('Source texts will not be splitted.')
+            logger.info('Source texts will not be splitted.')
         elif args.splittype == 'sentences':
             split = to_sentences
-            log.info('Source texts will be splitted by sentences.')
+            logger.info('Source texts will be splitted by sentences.')
         elif args.splittype == 'paragraphs':
             split = to_paragraphs
-            log.info('Source texts will be splitted by paragraphs.')
+            logger.info('Source texts will be splitted by paragraphs.')
 
-        for source_id, source_text in iter_source:
-            iter_source.set_description('source_id: {}'.format(source_id))
+        fragment_counter = 1
+        for s_id, source_text in iter_source:
+            iter_source.set_description('source_id: {}'.format(s_id))
             text = Text(source_text).tag_layer(['morph_analysis', 'paragraphs'])
             del text.tokens
-            log.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
-                      source_id, len(text.text), len(text.paragraphs), len(text.sentences)))
+            logger.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
+                s_id, len(text.text), len(text.paragraphs), len(text.sentences)))
 
-            for fragment, para_nr, sent_nr in split(text):
-                meta = {'source_id': source_id, 'para_nr': para_nr, 'sent_nr': sent_nr}
+            for fragment, start, paragraph_nr, sentence_nr in split(text):
+                meta = {'source_id': s_id, 'start': start, 'paragraph_nr': paragraph_nr, 'sentence_nr': sentence_nr}
                 collection_id = collection.insert(fragment, meta_data=meta)
 
-        read_cursor.autocommit = True
+                if fragment_counter == commit_interval:
+                    conn.commit()
+                    fragment_counter = 1
+                else:
+                    fragment_counter += 1
+        conn.commit()
+
+    conn.autocommit = True
+
+    columns = []
+    for c in ['id', 'data', 'source_id', 'start', 'paragraph_nr', 'sentence_nr']:
+        columns.append(SQL('\t{}.{}.{}').format(Identifier(schema), Identifier(table_name), Identifier(c)))
+    for c in source_columns:
+        columns.append(SQL('\t{}.{}.{}').format(Identifier(source_schema), Identifier(source_table), Identifier(c)))
+    logger.info('add source columns to the collection: {}'.format(source_columns))
+    with conn.cursor() as c:
+        temp_table_name = table_name + '_temp_1'
+        c.execute(SQL('CREATE TABLE {schema}.{temp_table} \n'
+                      'AS SELECT\n{columns} \n'
+                      'FROM {schema}.{table}, {source_schema}.{source_table} \n'
+                      'WHERE {schema}.{table}."source_id"={source_schema}.{source_table}.{source_id};'
+                      ).format(schema=Identifier(schema),
+                               temp_table=Identifier(temp_table_name),
+                               columns=SQL(',\n').join(columns),
+                               table=Identifier(table_name),
+                               source_schema=Identifier(source_schema),
+                               source_table=Identifier(source_table),
+                               source_id=Identifier(source_id)
+                               )
+                  )
+        logger.debug('successful query:\n' + c.query.decode())
+        c.execute(SQL('DROP TABLE {schema}.{table};').format(schema=Identifier(schema),
+                                                             table=Identifier(table_name)))
+        logger.debug('successful query: ' + c.query.decode())
+        c.execute(SQL('ALTER TABLE {schema}.{temp_table} RENAME TO {table};'
+                      ).format(schema=Identifier(schema),
+                               temp_table=Identifier(temp_table_name),
+                               table=Identifier(table_name)))
+        logger.debug('successful query: ' + c.query.decode())
