@@ -55,13 +55,13 @@ from collections import OrderedDict
 from psycopg2.sql import SQL, Identifier
 import tqdm
 from estnltk import Text
-from estnltk import get_logger
+from estnltk import logger
 from estnltk.converters import dict_to_text
 from estnltk.storage.postgres import PostgresStorage
 from estnltk.layer_operations import split_by
 
 
-logger = get_logger(args.logging)
+logger.setLevel(args.logging)
 
 schema = args.schema
 source_schema = args.source_schema
