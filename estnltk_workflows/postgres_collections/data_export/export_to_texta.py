@@ -51,9 +51,7 @@ args = parser.parse_args()
 
 from estnltk.storage.postgres import PostgresStorage
 from estnltk.converters import TextaExporter
-from estnltk_workflows.logger import logger
-
-logger = logger(args.logging, __name__)
+from estnltk import logger
 
 
 storage = PostgresStorage(pgpass_file=args.pgpass,
