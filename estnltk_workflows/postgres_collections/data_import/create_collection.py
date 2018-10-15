@@ -168,7 +168,6 @@ with storage.conn as conn:
             iter_source.set_description('source_id: {}'.format(s_id))
 
             if source_data:
-                #logger.info(source)
                 text = dict_to_text(source)
             else:
                 text = Text(source).tag_layer(['morph_analysis', 'paragraphs'])

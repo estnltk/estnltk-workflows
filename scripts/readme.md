@@ -1,13 +1,13 @@
 # Create collection
 
-Assume that there is a table that contains at least a unique id column and either column with plain text or column with
-Text objects in EstNltk 1.6 json format.
+Assume that there is a table that contains at least a unique id column and either a column of plain texts or a column
+of `Text` objects in EstNltk 1.6 json format.
 
 Display help
 ```
 estnltk-workflows$ scripts/create_collection -h
 ```
-and modify `scripts/create_collection.conf` file.
+and modify `scripts/create_collection.conf` file accordingly or use command line arguments.
 
 Create a collection `estnltk` texts with `words`, `sentences`, `paragraphs` and 
 `morph_analysis` layers attached. 
