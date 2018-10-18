@@ -38,7 +38,7 @@ In order to import the Estonian Reference Corpus (_Eesti keele koondkorpus_) int
 
   Note that you can also just proceed with the packed files, because processing scripts can deal with both packed and unpacked XML files.
 
-**3.** (_Optional_) Use the script  **`split_corpus_files_into_subsets.py`** for splitting the set of XML files from the previous step into N smaller subsets. This will enable parallel processing of the subsets in the step **4**.
+**3.** (_Optional_) Use the script  **`split_corpus_files_into_subsets.py`** for splitting the set of XML files from the first step into N smaller subsets. This will enable parallel processing of the subsets in the step **4**.
 
 Note that the script works with both zipped and unzipped files. For detailed help, run: `python split_corpus_files_into_subsets.py -h`
 

@@ -522,11 +522,11 @@ if __name__ == '__main__':
                              '* no_splitting -- each source text will be inserted into the database\n'+\
                              '  as whole, without any splitting applied;\n'+\
                              '\n'+
-                             '* paragraphs -- source texts will split into paragraphs (a Text object\n'+\
+                             '* paragraphs -- source texts will be split into paragraphs (a Text object\n'+\
                              '  will be created for each paragraph), and then inserted into the\n'+\
                              '  database;\n'
                              '\n'+
-                             '* sentences -- source texts will split into sentences (a Text object\n'+\
+                             '* sentences -- source texts will be split into sentences (a Text object\n'+\
                              '  will be created for each sentence), and then inserted into the\n'+\
                              '  database;\n'+\
                              '(default: no_splitting)\n\n'
