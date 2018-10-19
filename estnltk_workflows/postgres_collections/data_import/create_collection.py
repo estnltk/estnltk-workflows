@@ -156,22 +156,29 @@ with storage.conn as conn:
     with conn.cursor('read', withhold=True) as read_cursor:
         # by the documentation named cursor fetches itersize records at time from the backend reducing overhead
 
-        read_cursor.execute(SQL('SELECT {}, {} FROM {}.{}').format(
-            Identifier(source_id),
-            Identifier(source_text_column or source_data),
-            Identifier(source_schema),
-            Identifier(source_table))
-        )
+        try:
+            read_cursor.execute(SQL('SELECT {}, {} FROM {}.{};').format(
+                Identifier(source_id),
+                Identifier(source_text_column or source_data),
+                Identifier(source_schema),
+                Identifier(source_table))
+            )
+        except Exception as e:
+            logger.error(e)
+            raise
+        finally:
+            logger.debug(read_cursor.query.decode())
         iter_source = tqdm.tqdm(read_cursor,
                                 total=total,
                                 unit='doc',
-                                disable=args.logging not in {'DEBUG', 'INFO'})
+                                disable=args.logging not in {'DEBUG', 'INFO'},
+                                smoothing=0)
 
         commit_interval = 2000
         fragment_counter = 0
-        with collection.buffered_insert() as buffered_insert:
+        with collection.buffered_insert(buffer_size=1000) as buffered_insert:
             for s_id, source in iter_source:
-                iter_source.set_description('source_id: {}'.format(s_id))
+                iter_source.set_description('source_id: {}'.format(s_id), refresh=False)
 
                 if source_data:
                     text = dict_to_text(source)
@@ -183,7 +190,7 @@ with storage.conn as conn:
 
                 for fragment, start, paragraph_nr, sentence_nr in split(text):
                     meta = {'source_id': s_id, 'start': start, 'paragraph_nr': paragraph_nr, 'sentence_nr': sentence_nr}
-                    collection_id = buffered_insert(fragment, meta_data=meta, buffer_size=1000)
+                    collection_id = buffered_insert(text=fragment, meta_data=meta)
 
                     fragment_counter += 1
                     if fragment_counter % commit_interval == 0:
