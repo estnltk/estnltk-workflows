@@ -169,25 +169,25 @@ with storage.conn as conn:
 
         commit_interval = 2000
         fragment_counter = 0
-        for s_id, source in iter_source:
-            iter_source.set_description('source_id: {}'.format(s_id))
+        with collection.buffered_insert() as buffered_insert:
+            for s_id, source in iter_source:
+                iter_source.set_description('source_id: {}'.format(s_id))
 
-            if source_data:
-                text = dict_to_text(source)
-            else:
-                text = Text(source).tag_layer(['morph_analysis', 'paragraphs'])
-                del text.tokens
-                logger.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
-                    s_id, len(text.text), len(text.paragraphs), len(text.sentences)))
+                if source_data:
+                    text = dict_to_text(source)
+                else:
+                    text = Text(source).tag_layer(['morph_analysis', 'paragraphs'])
+                    del text.tokens
+                    logger.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
+                        s_id, len(text.text), len(text.paragraphs), len(text.sentences)))
 
-            for fragment, start, paragraph_nr, sentence_nr in split(text):
-                meta = {'source_id': s_id, 'start': start, 'paragraph_nr': paragraph_nr, 'sentence_nr': sentence_nr}
-                collection_id = collection.insert(fragment, meta_data=meta, buffer_size=1000)
+                for fragment, start, paragraph_nr, sentence_nr in split(text):
+                    meta = {'source_id': s_id, 'start': start, 'paragraph_nr': paragraph_nr, 'sentence_nr': sentence_nr}
+                    collection_id = buffered_insert(fragment, meta_data=meta, buffer_size=1000)
 
-                fragment_counter += 1
-                if fragment_counter % commit_interval == 0:
-                    conn.commit()
-            collection.flush_buffer()
+                    fragment_counter += 1
+                    if fragment_counter % commit_interval == 0:
+                        conn.commit()
         conn.commit()
         logger.info('size of the new collection: {}'.format(fragment_counter))
 
