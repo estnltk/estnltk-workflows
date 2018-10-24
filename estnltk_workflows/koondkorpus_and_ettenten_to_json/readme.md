@@ -1,4 +1,4 @@
-# Workflows for analysing large corpora with EstNLTK and saving as JSON files
+# Workflows for converting large corpora to JSON files and annotating with EstNLTK
 
 This folder contains command line workflows for processing large corpora -- the Estonian Reference Corpus and the etTenTen corpus -- with EstNLTK and saving into JSON format files.
 You can use these scripts if you need a basic pipeline for processing large corpora and adding linguistic analyses. 

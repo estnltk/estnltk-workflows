@@ -184,8 +184,8 @@ if __name__ == '__main__':
     sentence_separator    = ' '
     if preserve_tokenization or args.force_sentence_end_newlines:
        sentence_separator = '\n'
-    logging.basicConfig( level=(args.logging).upper() )
     logger = logging.getLogger('koondkonverter')
+    logger.setLevel( (args.logging).upper() )
     process(args.startdir, args.outdir, args.encoding, \
                            add_tokenization=add_tokenization, \
                            preserve_tokenization=preserve_tokenization,\
