@@ -220,7 +220,8 @@ def to_sentences(text):
 def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   encoding='utf-8', create_empty_docs=False, logger=None, \
                   tokenization=None, force_sentence_end_newlines=False, \
-                  splittype='no_splitting', metadata_extent='complete'):
+                  splittype='no_splitting', metadata_extent='complete', \
+                  buffer_size = 1000 ):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
@@ -280,6 +281,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
             specifies to which extent created Text object should be 
             populated with metadata. 
             (default: 'complete')
+        buffer_size: int (default: 1000)
+            buffer_size used during the database insert;
     """
     
     global special_tokens_tagger
@@ -318,72 +321,73 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     doc_id = 1
     total_insertions    = 0
     xml_files_processed = 0
-    for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
-                            create_empty_docs=create_empty_docs, \
-                            add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
-                            sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
-        # Get subcorpus name
-        subcorpus = ''
-        if '_xml_file' in doc.meta:
-            subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
-        # Reset the document counter if we have a new file coming up
-        xml_file = doc.meta.get('_xml_file', '')
-        if last_xml_file != xml_file:
-            doc_nr = 1
-        # Split the loaded document into smaller units if required
-        for doc_fragment, para_nr, sent_nr in split( doc ):
-            meta = {}
-            # Gather metadata
-            # 1) minimal metadata:
-            meta['file'] = xml_file
-            doc_fragment.meta['file'] = meta['file']
-            doc_fragment.meta['subcorpus'] = subcorpus
-            meta['subcorpus'] = subcorpus
-            if para_nr is not None:
-               meta['document_nr'] = doc_nr
-               doc_fragment.meta['doc_nr'] = doc_nr
-               meta['paragraph_nr'] = para_nr
-               doc_fragment.meta['para_nr'] = para_nr
-            if sent_nr is not None:
-               meta['sentence_nr'] = sent_nr
-               doc_fragment.meta['sent_nr'] = sent_nr
-            # 2) complete metadata:
-            if metadata_extent == 'complete':
-               for key, value in doc.meta.items():
-                   doc_fragment.meta[key] = value
-               # Collect remaining metadata
-               for key in ['title', 'type']:
-                   meta[key] = doc_fragment.meta.get(key, '')
-            # Finally, insert document 
-            row_id = collection.insert(doc_fragment, meta_data=meta)
-            total_insertions += 1
-            if logger:
-               # debugging stuff
-               # a) Description of the XML file/subdocument/paragraph/sentence
-               file_chunk_lst = [meta['file']]
-               file_chunk_lst.append(':')
-               file_chunk_lst.append(str(doc_nr))
-               if 'paragraph_nr' in meta:
-                  file_chunk_lst.append(':')
-                  file_chunk_lst.append(str(meta['paragraph_nr']))
-               if 'sentence_nr' in meta:
-                  file_chunk_lst.append(':')
-                  file_chunk_lst.append(str(meta['sentence_nr']))
-               file_chunk_str = ''.join( file_chunk_lst )
-               # b) Listing of annotation layers added to Text
-               with_layers = list(doc_fragment.layers.keys())
-               if with_layers:
-                  with_layers = ' with layers '+str(with_layers)
-               else:
-                  with_layers = ''
-               logger.debug((' {} inserted as Text #{}{}.').format(file_chunk_str, row_id, with_layers))
-               #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
-        doc_nr += 1
-        if last_xml_file != xml_file:
-            xml_files_processed += 1
-        last_xml_file = xml_file
-        #print('.', end = '')
-        #sys.stdout.flush()
+    with collection.buffered_insert(buffer_size=buffer_size) as buffered_insert:
+        for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
+                                create_empty_docs=create_empty_docs, \
+                                add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
+                                sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
+            # Get subcorpus name
+            subcorpus = ''
+            if '_xml_file' in doc.meta:
+                subcorpus = get_text_subcorpus_name( None, doc.meta['_xml_file'], doc, expand_names=False )
+            # Reset the document counter if we have a new file coming up
+            xml_file = doc.meta.get('_xml_file', '')
+            if last_xml_file != xml_file:
+                doc_nr = 1
+            # Split the loaded document into smaller units if required
+            for doc_fragment, para_nr, sent_nr in split( doc ):
+                meta = {}
+                # Gather metadata
+                # 1) minimal metadata:
+                meta['file'] = xml_file
+                doc_fragment.meta['file'] = meta['file']
+                doc_fragment.meta['subcorpus'] = subcorpus
+                meta['subcorpus'] = subcorpus
+                if para_nr is not None:
+                   meta['document_nr'] = doc_nr
+                   doc_fragment.meta['doc_nr'] = doc_nr
+                   meta['paragraph_nr'] = para_nr
+                   doc_fragment.meta['para_nr'] = para_nr
+                if sent_nr is not None:
+                   meta['sentence_nr'] = sent_nr
+                   doc_fragment.meta['sent_nr'] = sent_nr
+                # 2) complete metadata:
+                if metadata_extent == 'complete':
+                   for key, value in doc.meta.items():
+                       doc_fragment.meta[key] = value
+                   # Collect remaining metadata
+                   for key in ['title', 'type']:
+                       meta[key] = doc_fragment.meta.get(key, '')
+                # Finally, insert document 
+                row_id = buffered_insert(text=doc_fragment, meta_data=meta)
+                total_insertions += 1
+                if logger:
+                   # debugging stuff
+                   # a) Description of the XML file/subdocument/paragraph/sentence
+                   file_chunk_lst = [meta['file']]
+                   file_chunk_lst.append(':')
+                   file_chunk_lst.append(str(doc_nr))
+                   if 'paragraph_nr' in meta:
+                      file_chunk_lst.append(':')
+                      file_chunk_lst.append(str(meta['paragraph_nr']))
+                   if 'sentence_nr' in meta:
+                      file_chunk_lst.append(':')
+                      file_chunk_lst.append(str(meta['sentence_nr']))
+                   file_chunk_str = ''.join( file_chunk_lst )
+                   # b) Listing of annotation layers added to Text
+                   with_layers = list(doc_fragment.layers.keys())
+                   if with_layers:
+                      with_layers = ' with layers '+str(with_layers)
+                   else:
+                      with_layers = ''
+                   logger.debug((' {} inserted as Text{}.').format(file_chunk_str, with_layers))
+                   #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
+            doc_nr += 1
+            if last_xml_file != xml_file:
+                xml_files_processed += 1
+            last_xml_file = xml_file
+            #print('.', end = '')
+            #sys.stdout.flush()
     if logger:
         logger.info('Total {} XML files processed.'.format(xml_files_processed))
         logger.info('Total {} estnltk texts inserted into the database.'.format(total_insertions))
@@ -475,6 +479,8 @@ if __name__ == '__main__':
                         help='collection owner (default: None)')
     parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
                         help='required if the collection already exists')
+    parser.add_argument('-b', '--buffer_size', dest='buffer_size', type=int, default=1000,
+                        help='buffer size in buffered database insert (default: 1000)')
     # 3) Processing parameters 
     parser.add_argument('--in_files', dest='in_files', default = None, \
                         help='specifies a text file containing names of the input XML files\n'+\
@@ -590,9 +596,12 @@ if __name__ == '__main__':
     if args.splittype != 'no_splitting':
        if args.tokenization == 'none':
           raise Exception('(!) splittype '+str(args.splittype)+' cannot be used without tokenization!')
-    logging.basicConfig( level=(args.logging).upper() )
-    log = logging.getLogger(__name__)
+    if args.buffer_size and args.buffer_size < 0:
+       parser.error("Minimum buffer_size is 0")
     
+    log = logging.getLogger(__name__)
+    log.setLevel( (args.logging).upper() )
+
     # List of input XML files (if selective processing is used)
     focus_input_files = None
     if args.in_files:
@@ -666,7 +675,7 @@ if __name__ == '__main__':
                   create_empty_docs=False, logger=log, tokenization=args.tokenization,\
                   force_sentence_end_newlines=args.force_sentence_end_newlines, \
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
-                  focus_input_files=focus_input_files)
+                  focus_input_files=focus_input_files, buffer_size=args.buffer_size)
     storage.close()
     time_diff = datetime.now() - startTime
     log.info('Total processing time: {}'.format(time_diff))
