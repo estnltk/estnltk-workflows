@@ -38,6 +38,8 @@ parser.add_argument('--schema', dest='schema', action='store', nargs='?',
 parser.add_argument('--collection', dest='collection', action='store',
                     default='collection',
                     help='name of the collection (default: collection)')
+parser.add_argument('--collection_meta', dest='collection_meta', action='store', nargs='*',
+                    help='list of collection meta data columns')
 parser.add_argument('--role', dest='role', action='store', nargs='?',
                     help='collection owner')
 parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
@@ -74,8 +76,11 @@ exporter = TextaExporter(index=args.textaindex or args.schema,
 layers = args.input_layers + exporter.fact_layers
 
 try:
-    for collection_id, text in collection.select(layers=layers, progressbar='unicode'):
-        response = exporter.export(text, meta={'collection_id': collection_id})
+    with exporter.buffered_export() as buffered_export:
+        for collection_id, text, meta in collection.select(layers=layers, progressbar='unicode',
+                                                     collection_meta=args.collection_meta):
+            meta['collection_id'] = collection_id
+            response = buffered_export(text, meta=meta)
 
     logger.info('end script')
 except Exception as e:
