@@ -1,0 +1,2 @@
+from estnltk_workflows.postgres_collections.argparse import parse_args
+from estnltk_workflows.postgres_collections.data_processing.tag_collection import tag_collection
