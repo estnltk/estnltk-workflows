@@ -116,7 +116,6 @@ if not collection.exists():
                                ('sentence_nr', 'int')])
     collection = storage.get_collection(table_name, meta_fields=meta_fields)
     collection.create('collection of estnltk texts with segmentation and morphology layers')
-    logger.info('new collection {!r} created'.format(table_name))
 
 
 def to_text(text):
