@@ -1,26 +1,13 @@
-import argparse
+from estnltk_workflows.postgres_collections import get_arg_parser
 
-
-parser = argparse.ArgumentParser(description='Create a collection of estnltk texts '
-                                             'with segmentation and morphology layers.',
-                                 epilog='Options can be abbreviated to a prefix and stored in a @conf file.',
-                                 fromfile_prefix_chars='@')
+parser = get_arg_parser('collection', 'pgpass', 'host', 'port', 'user', 'dbname', 'role', 'schema',
+                        'mode', 'progressbar', 'logging',
+                        description='Create an EstNltk PostgreSQL collection of texts '
+                                    'with segmentation and morphology layers.')
 
 parser.add_argument('--splittype', dest='splittype', action='store', nargs='?',
                     default='no_splitting', choices=['no_splitting', 'sentences', 'paragraphs'],
                     help='split source texts (default: no_splitting)')
-parser.add_argument('--pgpass', dest='pgpass', action='store',
-                    default='~/.pgpass',
-                    help='name of the PostgreSQL password file (default: ~/.pgpass)')
-parser.add_argument('--database', dest='database', action='store',
-                    help='name of the PostgreSQL database (default: first in the pgpass file)')
-parser.add_argument('--schema', dest='schema', action='store',
-                    default='public',
-                    help='name of the collection schema (default: public)')
-parser.add_argument('--role', dest='role', action='store',
-                    help='collection creator role (default: current user)')
-parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
-                    help='required if the collection already exists')
 parser.add_argument('--source_schema', dest='source_schema', action='store',
                     default='public',
                     help='schema of the source table, (default: public)')
@@ -41,21 +28,19 @@ parser.add_argument('--source_columns', dest='source_columns', action='store', n
                     help='names of the source columns to be copied into the collection table; '
                          'can not include id, data, source_id, start, paragraph_nr or sentence_nr '
                          '(default: None)')
-parser.add_argument('--collection', dest='collection', action='store',
-                    default='collection',
-                    help='name of the collection (default: collection)')
 parser.add_argument('--layers', dest='layers', action='store', nargs='*',
                     choices=['words', 'morph_analysis', 'sentences', 'paragraphs'],
                     help='list of layers to be tagged on the texts (default: None)')
-parser.add_argument('--logging', dest='logging', action='store', default='INFO',
-                    choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                    help='logging level (default: INFO)')
+parser.add_argument('--chunk_column', dest='chunk_column', action='store', nargs='?',
+                    help='name of the chunk column, expects "chunk_value" not None')
+parser.add_argument('--chunk_value', dest='chunk_value', action='store', nargs='?',
+                    help='only rows with this value in the chunk column are selected')
 
 args = parser.parse_args()
 
 
 from collections import OrderedDict
-from psycopg2.sql import SQL, Identifier
+from psycopg2.sql import SQL, Identifier, Literal
 import tqdm
 from estnltk import Text
 from estnltk import logger
@@ -76,6 +61,8 @@ source_text_column = args.source_text
 source_columns = [c.strip() for c in args.source_columns or []]
 source_data = args.source_data
 
+assert (args.chunk_column is None) is (args.chunk_value is None), (args.chunk_column, args.chunk_value)
+
 collection_columns = ['id', 'data', 'source_id', 'start', 'paragraph_nr', 'sentence_nr']
 if set(source_columns) & set(collection_columns):
     logger.error('source_columns can not include: {}'.format(', '.join(set(source_columns) & set(collection_columns))))
@@ -86,7 +73,9 @@ if (source_text_column is None) is (source_data is None):
                   source_text_column, source_data))
     exit(1)
 
-storage = PostgresStorage(dbname=args.database,
+storage = PostgresStorage(dbname=args.dbname,
+                          user=args.user,
+                          host=args.host,
                           pgpass_file=args.pgpass,
                           schema=schema,
                           role=args.role)
@@ -175,11 +164,16 @@ layers_to_keep = sorted(layers_to_keep)
 
 logger.info('layers to keep: {}'.format(layers_to_keep))
 
+condition = SQL('')
+if args.chunk_column:
+    condition = SQL('where {}={}').format(Identifier(args.chunk_column),
+                                          Literal(args.chunk_value))
 
 with storage.conn as conn:
     with conn.cursor() as c:
-        c.execute(SQL('SELECT count(*) FROM {}.{}').format(Identifier(source_schema),
-                                                           Identifier(source_table)))
+        c.execute(SQL('SELECT count(*) FROM {}.{} {}').format(Identifier(source_schema),
+                                                              Identifier(source_table),
+                                                              condition))
         total = c.fetchone()[0]
 
     conn.autocommit = False
@@ -187,11 +181,12 @@ with storage.conn as conn:
         # by the documentation named cursor fetches itersize records at time from the backend reducing overhead
 
         try:
-            read_cursor.execute(SQL('SELECT {}, {} FROM {}.{};').format(
+            read_cursor.execute(SQL('SELECT {}, {} FROM {}.{} {};').format(
                 Identifier(source_id),
                 Identifier(source_text_column or source_data),
                 Identifier(source_schema),
-                Identifier(source_table))
+                Identifier(source_table),
+                condition)
             )
         except Exception as e:
             logger.error(e)
@@ -201,7 +196,8 @@ with storage.conn as conn:
         iter_source = tqdm.tqdm(read_cursor,
                                 total=total,
                                 unit='doc',
-                                disable=args.logging not in {'DEBUG', 'INFO'},
+                                ascii=(args.progressbar == 'ascii'),
+                                disable=(args.progressbar not in {'ascii', 'unicode'}),
                                 smoothing=0)
 
         commit_interval = 2000
