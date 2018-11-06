@@ -14,9 +14,6 @@ def get_arg_parser(*args, **kwargs):
                   'role', 'logging', 'progressbar', 'input_layers', 'output_layer'}
     assert args <= known_args, args - known_args
 
-    if 'schema' in args:
-        parser.add_argument('--schema', dest='schema', action='store', required=True,
-                            help='name of the database schema (required)')
     if 'collection' in args:
         parser.add_argument('--collection', dest='collection', action='store', required=True,
                             help='name of the collection (required)')
@@ -33,6 +30,9 @@ def get_arg_parser(*args, **kwargs):
     if 'dbname' in args:
         parser.add_argument('--dbname', dest='dbname', action='store', nargs='?',
                             help='database name to connect to (by default parsed from pgpass file)')
+    if 'schema' in args:
+        parser.add_argument('--schema', dest='schema', action='store', nargs='?',
+                            help='name of the database schema (required)')
     if 'user' in args:
         parser.add_argument('--user', dest='user', action='store', nargs='?',
                             help='database user name (by default parsed from pgpass file)')
