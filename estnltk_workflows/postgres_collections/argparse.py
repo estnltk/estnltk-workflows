@@ -40,7 +40,7 @@ def get_arg_parser(*args, **kwargs):
         parser.add_argument('--role', dest='role', action='store', nargs='?',
                             help='database user role (default: user)')
     if 'mode' in args:
-        parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite'], nargs='?',
+        parser.add_argument('--mode', dest='mode', action='store', choices=['extend', 'overwrite'], nargs='?',
                             help='required if the output object already exists in the collection ')
     if 'logging' in args:
         parser.add_argument('--logging', dest='logging', action='store', default='INFO',
