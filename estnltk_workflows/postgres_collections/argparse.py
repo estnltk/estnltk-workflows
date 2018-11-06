@@ -32,7 +32,7 @@ def get_arg_parser(*args, **kwargs):
                             help='database name to connect to (by default parsed from pgpass file)')
     if 'schema' in args:
         parser.add_argument('--schema', dest='schema', action='store', nargs='?',
-                            help='name of the database schema (required)')
+                            help='name of the database schema')
     if 'user' in args:
         parser.add_argument('--user', dest='user', action='store', nargs='?',
                             help='database user name (by default parsed from pgpass file)')
