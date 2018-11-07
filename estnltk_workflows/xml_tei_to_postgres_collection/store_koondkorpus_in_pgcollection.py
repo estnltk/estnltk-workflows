@@ -219,7 +219,7 @@ def to_sentences(text):
 
 def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   encoding='utf-8', create_empty_docs=False, logger=None, \
-                  tokenization=None, force_sentence_end_newlines=False, \
+                  tokenization=None, use_sentence_sep_newlines=False, \
                   splittype='no_splitting', metadata_extent='complete', \
                   buffer_size = 1000 ):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
@@ -261,11 +261,14 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                             be preserved in layers of the text; 
             * 'estnltk'  -- text's original tokenization will be 
                             overwritten by estnltk's tokenization;
-        force_sentence_end_newlines: boolean
+        use_sentence_sep_newlines: boolean
             If set, then during the reconstruction of a text string, 
-            sentence endings from the original XML mark-up will always 
-            be marked with newlines in the text string, regardless 
-            the tokenization option used.
+            sentences from the original XML mark-up will always 
+            separated from each other by a newline, regardless the 
+            tokenization option used.  As a result, sentence endings 
+            can also be noticed in the reconstructed text string.
+            Otherwise, a single space character will be used as a 
+            sentence separator.
             (default: False)
         splittype: ['no_splitting', 'sentences', 'paragraphs']
             specifies if and how texts should be split before inserting
@@ -294,7 +297,6 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     assert metadata_extent in ['minimal', 'complete']
     add_tokenization      = False
     preserve_tokenization = False
-    sentence_separator    = ' '
     paragraph_separator   = '\n\n'
     if tokenization:
         if tokenization == 'none':
@@ -302,11 +304,11 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
         if tokenization == 'preserve':
            add_tokenization      = True
            preserve_tokenization = True
-           sentence_separator    = '\n'
         elif tokenization == 'estnltk':
            add_tokenization      = True
            preserve_tokenization = False
-    if force_sentence_end_newlines:
+    sentence_separator    = ' '
+    if use_sentence_sep_newlines:
         sentence_separator = '\n'
     # Choose how the loaded document will be 
     # split before the insertion
@@ -500,7 +502,7 @@ if __name__ == '__main__':
                              
                              '* preserve -- the text string will be reconstructed by joining \n'+\
                              '  words from the original XML mark-up by spaces, sentences by \n'+\
-                             '  newlines, and paragraphs by double newlines. Tokenization layers \n'+\
+                             '  spaces, and paragraphs by double newlines. Tokenization layers \n'+\
                              '  will be created, and they\'ll preserve the original tokenization \n'+\
                              '  of XML files.\n'+\
                              "    Note #1: tokenization layers 'tokens', 'compound_tokens', \n"+\
@@ -538,16 +540,15 @@ if __name__ == '__main__':
                              '(default: no_splitting)\n\n'
                              '(!) Note: you can only use --splittype if tokenization is turned on!'
                         )
-    parser.add_argument('-f', '--force_sentence_end_newlines', dest='force_sentence_end_newlines', \
+    parser.add_argument('-n', '--use_sentence_sep_newlines', dest='use_sentence_sep_newlines', \
                         default=False, \
                         action='store_true', \
-                        help="If set, then during the reconstruction of a text string, sentence \n"+
-                             "endings from the original XML mark-up will always be marked with\n"+
-                             "newlines in the text string, regardless the tokenization option\n"+\
-                             "used.\n"
-                             "You can use this option if you want to replace spaces between the \n"+\
-                             "original sentences with newlines when using the tokenization options\n"+\
-                             " -t none, or -t estnltk.\n"+\
+                        help="If set, then during the reconstruction of a text string, sentences\n"+
+                             "from the original XML mark-up will always be separated from each other\n"+
+                             "by a newline, regardless the tokenization option used.  As  a  result,\n"+\
+                             "sentence endings can also  be  noticed  in  the  reconstructed  text\n"+\
+                             "string.\n"+\
+                             "Otherwise, a single space character will be used as a sentence separator.\n"+\
                              "(default: False)",\
                         )
     parser.add_argument('-m', '--metadata_extent', dest='metadata_extent', \
@@ -673,7 +674,7 @@ if __name__ == '__main__':
     startTime = datetime.now()
     process_files(args.rootdir, doc_iterator, collection, encoding=args.encoding, \
                   create_empty_docs=False, logger=log, tokenization=args.tokenization,\
-                  force_sentence_end_newlines=args.force_sentence_end_newlines, \
+                  use_sentence_sep_newlines=args.use_sentence_sep_newlines, \
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
                   focus_input_files=focus_input_files, buffer_size=args.buffer_size)
     storage.close()
