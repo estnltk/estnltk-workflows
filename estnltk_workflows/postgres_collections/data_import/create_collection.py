@@ -80,6 +80,40 @@ storage = PostgresStorage(dbname=args.dbname,
                           schema=schema,
                           role=args.role)
 
+condition = SQL('')
+if args.chunk_column:
+    condition = SQL('where {}={}').format(Identifier(args.chunk_column),
+                                          Literal(args.chunk_value))
+
+with storage.conn.cursor() as c:
+    c.execute(SQL('SELECT count({}) FROM {}.{}').format(Identifier(source_id),
+                                                        Identifier(source_schema),
+                                                        Identifier(source_table)
+                                                        ))
+    total = c.fetchone()[0]
+    logger.debug('total number of rows in the source table: {}'.format(total))
+    c.execute(SQL('SELECT count(DISTINCT {}) FROM {}.{}').format(Identifier(source_id),
+                                                                 Identifier(source_schema),
+                                                                 Identifier(source_table)
+                                                                 ))
+    distinct = c.fetchone()[0]
+    if total != distinct:
+        logger.error('values in the source table column {!r} are not unique, {} distinct values in total'.format(
+                     source_id, distinct
+                     )
+                     )
+        exit(1)
+
+    if args.chunk_column is not None:
+        c.execute(SQL('SELECT count({}) FROM {}.{} {}').format(
+                      Identifier(source_id),
+                      Identifier(source_schema),
+                      Identifier(source_table),
+                      condition))
+        total = c.fetchone()[0]
+        logger.debug('total number of rows in the chunk: {}'.format(total))
+
+
 if not storage.table_exists(table=source_table, schema=source_schema):
     logger.error('source table does not exist: "{}"."{}"'.format(source_schema, source_table))
     exit(1)
@@ -164,22 +198,10 @@ layers_to_keep = sorted(layers_to_keep)
 
 logger.info('layers to keep: {}'.format(layers_to_keep))
 
-condition = SQL('')
-if args.chunk_column:
-    condition = SQL('where {}={}').format(Identifier(args.chunk_column),
-                                          Literal(args.chunk_value))
-
 with storage.conn as conn:
-    with conn.cursor() as c:
-        c.execute(SQL('SELECT count(*) FROM {}.{} {}').format(Identifier(source_schema),
-                                                              Identifier(source_table),
-                                                              condition))
-        total = c.fetchone()[0]
-
     conn.autocommit = False
     with conn.cursor('read', withhold=True) as read_cursor:
         # by the documentation named cursor fetches itersize records at time from the backend reducing overhead
-
         try:
             read_cursor.execute(SQL('SELECT {}, {} FROM {}.{} {};').format(
                 Identifier(source_id),
@@ -257,5 +279,9 @@ with storage.conn as conn:
                                temp_table=Identifier(temp_table_name),
                                table=Identifier(table_name)))
         logger.debug('successful query: ' + c.query.decode())
+        c.execute(SQL('ALTER TABLE {schema}.{table} ADD PRIMARY KEY ("id");'
+                      ).format(schema=Identifier(schema),
+                               table=Identifier(table_name)))
+        logger.debug(c.query.decode())
 
 logger.info('end script')
