@@ -343,6 +343,9 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                 # 1) minimal metadata:
                 meta['file'] = xml_file
                 doc_fragment.meta['file'] = meta['file']
+                # Remove redundant attribute '_xml_file'
+                if doc_fragment.meta.get('_xml_file', '') == meta['file']:
+                   del doc_fragment.meta['_xml_file']
                 doc_fragment.meta['subcorpus'] = subcorpus
                 meta['subcorpus'] = subcorpus
                 if para_nr is not None:
