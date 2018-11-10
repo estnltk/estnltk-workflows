@@ -221,7 +221,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   encoding='utf-8', create_empty_docs=False, logger=None, \
                   tokenization=None, use_sentence_sep_newlines=False, \
                   splittype='no_splitting', metadata_extent='complete', \
-                  buffer_size = 1000, skippable_file_chunks=None ):
+                  buffer_size = 1000, skippable_documents=None ):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
@@ -286,18 +286,22 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
             (default: 'complete')
         buffer_size: int (default: 1000)
             buffer_size used during the database insert;
-        skippable_file_chunks: set (default: None)
-            A set of XML file chunks (strings), which have already been inserted 
-            into the database, and which insertion should be skipped. 
-            An XML file chunk is a string in the format:
+        skippable_documents: set of str (default: None)
+            A set of XML document names corresponding to the documents 
+            that have already been processed and inserted into the 
+            database. All documents inside this set will skipped.
+            An XML document name is a string in the format:
                     XML_file_name + ':' + 
                     subdocument_number + ':' + 
                     paragraph_number + ':' + 
                     sentence_number
-            Paragraph_number and sentence_number are skipped, if splitting is 
-            not used.
-            If skippable_file_chunks is None or empty, all processed files will 
-            be inserted into the database.
+            Paragraph_number and sentence_number can be missing, if the
+            database does not contain the corresponding fields.
+            If skippable_documents is None or empty, all processed files 
+            will be inserted into the database.
+            Note: skippable_documents is more fine-grained set than 
+            focus_input_files, thus overrides the skipping directed by
+            the later set.
     """
     
     global special_tokens_tagger
@@ -310,8 +314,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     add_tokenization      = False
     preserve_tokenization = False
     paragraph_separator   = '\n\n'
-    if skippable_file_chunks == None:
-        skippable_file_chunks = set()
+    if skippable_documents == None:
+        skippable_documents = set()
     if tokenization:
         if tokenization == 'none':
            tokenization = None
@@ -390,7 +394,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                    file_chunk_lst.append(str(meta['sentence_nr']))
                 file_chunk_str = ''.join( file_chunk_lst )
                 # Finally, insert document (if not skippable)
-                if file_chunk_str not in skippable_file_chunks:
+                if file_chunk_str not in skippable_documents:
                    row_id = buffered_insert(text=doc_fragment, meta_data=meta)
                    total_insertions += 1
                 if logger:
@@ -401,7 +405,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                       with_layers = ' with layers '+str(with_layers)
                    else:
                       with_layers = ''
-                   if file_chunk_str not in skippable_file_chunks:
+                   if file_chunk_str not in skippable_documents:
                       logger.debug((' {} inserted as Text{}.').format(file_chunk_str, with_layers))
                    else:
                       logger.debug((' {} skipped (already in the database).').format(file_chunk_str))
@@ -448,6 +452,7 @@ def fetch_column_names( storage, schema, collection ):
 
 def fetch_skippable_documents( storage, schema, collection, meta_fields, logger ):
     """ Fetches names of existing / skippable documents from the PostgreSQL storage.
+        Returns a set of existing document names.
         A document name is represented as a string in the format:
                XML_file_name + ':' + 
                subdocument_number + ':' + 
@@ -455,7 +460,6 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
                sentence_number
         Paragraph_number and sentence_number are skipped, if they are not in 
         meta_fields.
-        Returns a set of document names.
         
         Parameters
         ----------
@@ -772,12 +776,13 @@ if __name__ == '__main__':
          collection.create('collection of estnltk texts'+tokenization_desc)
          log.info(' New collection {!r} created.'.format(args.collection))
     
-    files_already_in_db = None
+    docs_already_in_db = None
     if args.skip_existing == True and args.mode == 'append':
-         files_already_in_db = \
-             fetch_skippable_documents(storage, args.schema, args.collection, meta_fields, log )
-         log.info('Collection {!r} contains {} existing documents. '+\
-                  'Existing documents will be skipped.'.format(args.collection, len(files_already_in_db)))
+         # If skipping is required, load documents that are already in DB
+         docs_already_in_db = \
+             fetch_skippable_documents(storage, args.schema, args.collection, meta_fields, log)
+         log.info(('Collection {!r} contains {} existing documents. '+\
+                   'Existing documents will be skipped.').format(args.collection, len(docs_already_in_db)) )
     
     if args.splittype == 'no_splitting':
          log.info(' Source texts will not be splitted.')
@@ -792,7 +797,7 @@ if __name__ == '__main__':
                   use_sentence_sep_newlines=args.use_sentence_sep_newlines, \
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
                   focus_input_files=focus_input_files, buffer_size=args.buffer_size, \
-                  skippable_file_chunks=files_already_in_db)
+                  skippable_documents=docs_already_in_db)
     storage.close()
     time_diff = datetime.now() - startTime
     log.info('Total processing time: {}'.format(time_diff))
