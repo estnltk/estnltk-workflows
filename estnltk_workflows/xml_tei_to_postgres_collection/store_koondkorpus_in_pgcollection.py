@@ -221,7 +221,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   encoding='utf-8', create_empty_docs=False, logger=None, \
                   tokenization=None, use_sentence_sep_newlines=False, \
                   splittype='no_splitting', metadata_extent='complete', \
-                  buffer_size = 1000 ):
+                  buffer_size = 1000, skippable_file_chunks=None ):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
@@ -286,6 +286,18 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
             (default: 'complete')
         buffer_size: int (default: 1000)
             buffer_size used during the database insert;
+        skippable_file_chunks: set (default: None)
+            A set of XML file chunks (strings), which have already been inserted 
+            into the database, and which insertion should be skipped. 
+            An XML file chunk is a string in the format:
+                    XML_file_name + ':' + 
+                    subdocument_number + ':' + 
+                    paragraph_number + ':' + 
+                    sentence_number
+            Paragraph_number and sentence_number are skipped, if splitting is 
+            not used.
+            If skippable_file_chunks is None or empty, all processed files will 
+            be inserted into the database.
     """
     
     global special_tokens_tagger
@@ -298,6 +310,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     add_tokenization      = False
     preserve_tokenization = False
     paragraph_separator   = '\n\n'
+    if skippable_file_chunks == None:
+        skippable_file_chunks = set()
     if tokenization:
         if tokenization == 'none':
            tokenization = None
@@ -363,29 +377,34 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                    # Collect remaining metadata
                    for key in ['title', 'type']:
                        meta[key] = doc_fragment.meta.get(key, '')
-                # Finally, insert document 
-                row_id = buffered_insert(text=doc_fragment, meta_data=meta)
-                total_insertions += 1
-                if logger:
-                   # debugging stuff
-                   # a) Description of the XML file/subdocument/paragraph/sentence
-                   file_chunk_lst = [meta['file']]
+                # Create an identifier of the insertable chunk:
+                #  XML file + subdocument nr + paragraph nr + sentence nr
+                file_chunk_lst = [meta['file']]
+                file_chunk_lst.append(':')
+                file_chunk_lst.append(str(doc_nr))
+                if 'paragraph_nr' in meta:
                    file_chunk_lst.append(':')
-                   file_chunk_lst.append(str(doc_nr))
-                   if 'paragraph_nr' in meta:
-                      file_chunk_lst.append(':')
-                      file_chunk_lst.append(str(meta['paragraph_nr']))
-                   if 'sentence_nr' in meta:
-                      file_chunk_lst.append(':')
-                      file_chunk_lst.append(str(meta['sentence_nr']))
-                   file_chunk_str = ''.join( file_chunk_lst )
-                   # b) Listing of annotation layers added to Text
+                   file_chunk_lst.append(str(meta['paragraph_nr']))
+                if 'sentence_nr' in meta:
+                   file_chunk_lst.append(':')
+                   file_chunk_lst.append(str(meta['sentence_nr']))
+                file_chunk_str = ''.join( file_chunk_lst )
+                # Finally, insert document (if not skippable)
+                if file_chunk_str not in skippable_file_chunks:
+                   row_id = buffered_insert(text=doc_fragment, meta_data=meta)
+                   total_insertions += 1
+                if logger:
+                   # Debugging stuff
+                   # Listing of annotation layers added to Text
                    with_layers = list(doc_fragment.layers.keys())
                    if with_layers:
                       with_layers = ' with layers '+str(with_layers)
                    else:
                       with_layers = ''
-                   logger.debug((' {} inserted as Text{}.').format(file_chunk_str, with_layers))
+                   if file_chunk_str not in skippable_file_chunks:
+                      logger.debug((' {} inserted as Text{}.').format(file_chunk_str, with_layers))
+                   else:
+                      logger.debug((' {} skipped (already in the database).').format(file_chunk_str))
                    #logger.debug('  Metadata: {}'.format(doc_fragment.meta))
             doc_nr += 1
             if last_xml_file != xml_file:
@@ -424,6 +443,83 @@ def fetch_column_names( storage, schema, collection ):
                                                                   Identifier(collection)))
               colnames = [desc[0] for desc in c.description]
     return colnames
+
+
+
+def fetch_skippable_documents( storage, schema, collection, meta_fields, logger ):
+    """ Fetches names of existing / skippable documents from the PostgreSQL storage.
+        A document name is represented as a string in the format:
+               XML_file_name + ':' + 
+               subdocument_number + ':' + 
+               paragraph_number + ':' + 
+               sentence_number
+        Paragraph_number and sentence_number are skipped, if they are not in 
+        meta_fields.
+        Returns a set of document names.
+        
+        Parameters
+        ----------
+        storage: PostgresStorage
+            PostgresStorage to be queried for column names of the collection;
+        schema: str
+            Name of the schema;
+        collection: boolean
+            Name of the collection / db table;
+        meta_fields: OrderedDict
+            Current fields of the collection / database table. 
+        logger: logger
+            For logging the stuff.
+        
+        Returns
+        -------
+        set of str
+            Set of document names corresponding to documents already existing in 
+            the collection;
+    """
+    # Filter fields: keep only fields that correspond to the fields of 
+    # the current table
+    query_fields = ['id', 'file', 'document_nr', 'paragraph_nr', 'sentence_nr']
+    query_fields = [f for f in query_fields if f == 'id' or f in meta_fields.keys()]
+    prev_fname   = None
+    fname_doc_nr = 1
+    file_chunks_in_db = set()
+    # Construct the query
+    sql_str = 'SELECT '+(','.join(query_fields))+' FROM {}.{} ORDER BY '+(','.join(query_fields))
+    with storage.conn as conn:
+        # Named cursors: http://initd.org/psycopg/docs/usage.html#server-side-cursors
+        with conn.cursor('read_fname_chunks', withhold=True) as read_cursor:
+            try:
+                read_cursor.execute(SQL(sql_str).format(Identifier(schema),
+                                                        Identifier(collection)))
+            except Exception as e:
+                logger.error(e)
+                raise
+            finally:
+                logger.debug(read_cursor.query.decode())
+            for items in read_cursor:
+                doc_id = items[0]
+                fname  = items[1]
+                if prev_fname and prev_fname != fname:
+                    # Reset document number (in case of a new file)
+                    fname_doc_nr = 1
+                doc_nr = items[2] if 'document_nr' in query_fields else fname_doc_nr
+                paragraph_nr = items[3] if 'paragraph_nr' in query_fields else None
+                sentence_nr  = items[4] if 'sentence_nr' in query_fields else None
+                # Reconstruct file name chunk
+                file_chunk_lst = [fname]
+                file_chunk_lst.append(':')
+                file_chunk_lst.append(str(doc_nr))
+                if paragraph_nr:
+                   file_chunk_lst.append(':')
+                   file_chunk_lst.append(str(paragraph_nr))
+                if sentence_nr:
+                   file_chunk_lst.append(':')
+                   file_chunk_lst.append(str(sentence_nr))
+                file_chunk_str = ''.join( file_chunk_lst )
+                file_chunks_in_db.add( file_chunk_str )
+                prev_fname = fname
+                fname_doc_nr += 1
+    return file_chunks_in_db
 
 
 
@@ -486,6 +582,15 @@ if __name__ == '__main__':
                         help='required if the collection already exists')
     parser.add_argument('-b', '--buffer_size', dest='buffer_size', type=int, default=1000,
                         help='buffer size in buffered database insert (default: 1000)')
+    parser.add_argument('-s', '--skip_existing', dest='skip_existing', \
+                        default=False, \
+                        action='store_true', \
+                        help="If set, then all the newly created documents are checked for their\n"+
+                             "existence in the database, and any document already in the database\n"+\
+                             "will be skipped. Note that the checking is based on file / document\n"+\
+                             "names, not by their content.\n"+\
+                             "(default: False)",\
+                        )
     # 3) Processing parameters 
     parser.add_argument('--in_files', dest='in_files', default = None, \
                         help='specifies a text file containing names of the input XML files\n'+\
@@ -667,6 +772,13 @@ if __name__ == '__main__':
          collection.create('collection of estnltk texts'+tokenization_desc)
          log.info(' New collection {!r} created.'.format(args.collection))
     
+    files_already_in_db = None
+    if args.skip_existing == True and args.mode == 'append':
+         files_already_in_db = \
+             fetch_skippable_documents(storage, args.schema, args.collection, meta_fields, log )
+         log.info('Collection {!r} contains {} existing documents. '+\
+                  'Existing documents will be skipped.'.format(args.collection, len(files_already_in_db)))
+    
     if args.splittype == 'no_splitting':
          log.info(' Source texts will not be splitted.')
     elif args.splittype == 'sentences':
@@ -679,7 +791,8 @@ if __name__ == '__main__':
                   create_empty_docs=False, logger=log, tokenization=args.tokenization,\
                   use_sentence_sep_newlines=args.use_sentence_sep_newlines, \
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
-                  focus_input_files=focus_input_files, buffer_size=args.buffer_size)
+                  focus_input_files=focus_input_files, buffer_size=args.buffer_size, \
+                  skippable_file_chunks=files_already_in_db)
     storage.close()
     time_diff = datetime.now() - startTime
     log.info('Total processing time: {}'.format(time_diff))
