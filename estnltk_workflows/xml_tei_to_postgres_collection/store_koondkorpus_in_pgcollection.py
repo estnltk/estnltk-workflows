@@ -520,6 +520,11 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
                    file_chunk_lst.append(':')
                    file_chunk_lst.append(str(sentence_nr))
                 file_chunk_str = ''.join( file_chunk_lst )
+                # Sanity check: file_chunk_str should be unique
+                # if not, then we cannot expect skipping to be 
+                # consistent ...
+                assert file_chunk_str not in file_chunks_in_db, \
+                    ' (!) Document chunk {!r} appears more than once in database.'.format(file_chunk_str)
                 file_chunks_in_db.add( file_chunk_str )
                 prev_fname = fname
                 fname_doc_nr += 1
