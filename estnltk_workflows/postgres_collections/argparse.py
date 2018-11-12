@@ -11,7 +11,7 @@ def get_arg_parser(*args, **kwargs):
 
     args = set(args)
     known_args = {'pgpass', 'host', 'port', 'dbname', 'user', 'schema', 'role', 'collection', 'mode',
-                  'role', 'logging', 'progressbar', 'input_layers', 'output_layer'}
+                  'role', 'logging', 'progressbar', 'input_layer', 'input_layers', 'output_layer', 'output_attributes'}
     assert args <= known_args, args - known_args
 
     if 'collection' in args:
@@ -50,12 +50,18 @@ def get_arg_parser(*args, **kwargs):
         parser.add_argument('--progressbar', dest='progressbar', action='store', nargs='?',
                             choices=['ascii', 'unicode', 'notebook'],
                             help='progressbar type (default: no progressbar)')
+    if 'input_layer' in args:
+        parser.add_argument('--input_layer', dest='input_layer', action='store', nargs='?',
+                            help='name of the input layer')
     if 'input_layers' in args:
         parser.add_argument('--input_layers', dest='input_layers', action='store', nargs='*',
                             help='list of the input layer names')
     if 'output_layer' in args:
         parser.add_argument('--output_layer', dest='output_layer', action='store', nargs='?',
                             help='name of the output layer')
+    if 'output_attributes' in args:
+        parser.add_argument('--output_attributes', dest='output_attributes', action='store', nargs='*',
+                            help='list of the output attribute names', metavar='ATTRIBUTE')
     return parser
 
 
