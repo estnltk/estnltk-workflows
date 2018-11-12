@@ -234,8 +234,6 @@ with storage.conn as conn:
                     text = Text(source).tag_layer(layers_to_tag)
                     if 'tokens' in text.layers:
                         del text.tokens
-                    logger.debug('source_id: {}, text length: {}, paragraphs: {}, sentences: {}'.format(
-                        s_id, len(text.text), len(text.paragraphs), len(text.sentences)))
 
                 for fragment, start, paragraph_nr, sentence_nr in split(text):
                     meta = {'source_id': s_id, 'start': start, 'paragraph_nr': paragraph_nr, 'sentence_nr': sentence_nr}
