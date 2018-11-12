@@ -10,7 +10,7 @@ import os.path
 import argparse
 from argparse import RawTextHelpFormatter
 
-import logging
+from estnltk import logger
 
 from collections import OrderedDict
 
@@ -221,7 +221,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   encoding='utf-8', create_empty_docs=False, logger=None, \
                   tokenization=None, use_sentence_sep_newlines=False, \
                   splittype='no_splitting', metadata_extent='complete', \
-                  buffer_size = 1000, skippable_documents=None ):
+                  buffer_size = 1000, insert_query_size = 5000000, \
+                  skippable_documents=None ):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
@@ -286,6 +287,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
             (default: 'complete')
         buffer_size: int (default: 1000)
             buffer_size used during the database insert;
+        insert_query_size: int (default: 5000000)
+            maximum insert query size used during the database insert;
         skippable_documents: set of str (default: None)
             A set of XML document names corresponding to the documents 
             that have already been processed and inserted into the 
@@ -341,7 +344,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     doc_id = 1
     total_insertions    = 0
     xml_files_processed = 0
-    with collection.buffered_insert(buffer_size=buffer_size) as buffered_insert:
+    with collection.buffered_insert(buffer_size=buffer_size, query_length_limit=insert_query_size) as buffered_insert:
         for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
                                 create_empty_docs=create_empty_docs, \
                                 add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
@@ -591,13 +594,16 @@ if __name__ == '__main__':
                         help='required if the collection already exists')
     parser.add_argument('-b', '--buffer_size', dest='buffer_size', type=int, default=1000,
                         help='buffer size in buffered database insert (default: 1000)')
+    parser.add_argument('-q', '--insert_query_size', dest='insert_query_size', type=int, default=5000000,
+                        help='maximum insert query size in buffered database insert (default: 5000000)')
     parser.add_argument('-s', '--skip_existing', dest='skip_existing', \
                         default=False, \
                         action='store_true', \
                         help="If set, then all the newly created documents are checked for their\n"+
                              "existence in the database, and any document already in the database\n"+\
                              "will be skipped. Note that the checking is based on file / document\n"+\
-                             "names, not by their content.\n"+\
+                             "names, not by their content. So, this only works if all the XML files\n"+\
+                             "in the corpus have unique file names.\n"+
                              "(default: False)",\
                         )
     # 3) Processing parameters 
@@ -716,9 +722,12 @@ if __name__ == '__main__':
           raise Exception('(!) splittype '+str(args.splittype)+' cannot be used without tokenization!')
     if args.buffer_size and args.buffer_size < 0:
        parser.error("Minimum buffer_size is 0")
+    if args.insert_query_size and args.insert_query_size < 50:
+       parser.error("Minimum insert_query_size is 50")
+       
     
-    log = logging.getLogger(__name__)
-    log.setLevel( (args.logging).upper() )
+    logger.setLevel( (args.logging).upper() )
+    log = logger
 
     # List of input XML files (if selective processing is used)
     focus_input_files = None
@@ -802,6 +811,7 @@ if __name__ == '__main__':
                   use_sentence_sep_newlines=args.use_sentence_sep_newlines, \
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
                   focus_input_files=focus_input_files, buffer_size=args.buffer_size, \
+                  insert_query_size=args.insert_query_size, \
                   skippable_documents=docs_already_in_db)
     storage.close()
     time_diff = datetime.now() - startTime
