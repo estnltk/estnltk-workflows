@@ -485,7 +485,7 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
     """
     # Filter fields: keep only fields that correspond to the fields of 
     # the current table
-    query_fields = ['id', 'file', 'document_nr', 'paragraph_nr', 'sentence_nr']
+    query_fields = ['file', 'id', 'document_nr', 'paragraph_nr', 'sentence_nr']
     query_fields = [f for f in query_fields if f == 'id' or f in meta_fields.keys()]
     prev_fname   = None
     fname_doc_nr = 1
