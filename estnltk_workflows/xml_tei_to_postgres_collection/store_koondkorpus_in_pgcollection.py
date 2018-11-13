@@ -504,8 +504,8 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
             finally:
                 logger.debug(read_cursor.query.decode())
             for items in read_cursor:
-                doc_id = items[0]
-                fname  = items[1]
+                fname  = items[0]
+                doc_id = items[1]
                 if prev_fname and prev_fname != fname:
                     # Reset document number (in case of a new file)
                     fname_doc_nr = 1
