@@ -708,8 +708,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if not os.path.isdir(args.rootdir):
-       print('(!) Argument rootdir should be a directory')
-       arg_parser.print_help()
+       log.error('(!) Argument rootdir should be a directory')
+       parser.print_help()
+       exit(1)
     doc_iterator = None 
     if args.input_format == 'zipped':
        doc_iterator = iter_packed_xml
