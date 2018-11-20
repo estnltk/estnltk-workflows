@@ -16,6 +16,7 @@ In order to import the Estonian Reference Corpus (_Eesti keele koondkorpus_) int
         foorum_uudisgrupp_kommentaar.zip
         Horisont.zip
         Ilukirjandus.zip
+        jututoad_xml.zip
         Kroonika.zip
         LaaneElu.zip
         Luup.zip
@@ -28,7 +29,7 @@ In order to import the Estonian Reference Corpus (_Eesti keele koondkorpus_) int
         Teadusartiklid.zip
         Valgamaalane.zip
 
-  (19 files at total)
+  (20 files at total)
 
 **2.** (_Optional_) You can unpack all the files before processing (this can be useful for debugging). To unpack the files in UNIX, you can use commands:
 
