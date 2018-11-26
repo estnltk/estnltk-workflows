@@ -8,6 +8,8 @@
 import os, sys
 import os.path
 import argparse
+from functools import partial
+
 from argparse import RawTextHelpFormatter
 
 from estnltk import logger
@@ -34,7 +36,8 @@ def iter_unpacked_xml(root_dir, focus_input_files=None, \
                       add_tokenization=False, \
                       preserve_tokenization=False, \
                       sentence_separator='\n', \
-                      paragraph_separator='\n\n' ):
+                      paragraph_separator='\n\n',\
+                      orig_tokenization_layer_name_prefix=''):
     """ Traverses recursively root_dir to find XML TEI documents,
         converts found documents to EstNLTK Text objects, and 
         yields created Text objects.
@@ -84,6 +87,10 @@ def iter_unpacked_xml(root_dir, focus_input_files=None, \
             of the text. The parameter value should be provided, None is not 
             allowed.
             (Default: '\n\n')
+        orig_tokenization_layer_name_prefix: str
+            Prefix that will be added to names of layers of original tokenization, 
+            if preserve_tokenization==True. 
+            (Default: '')
     """
     for dirpath, dirnames, filenames in os.walk(root_dir):
         if len(dirnames) > 0 or len(filenames) == 0 or 'bin' in dirpath:
@@ -100,7 +107,8 @@ def iter_unpacked_xml(root_dir, focus_input_files=None, \
                                     preserve_tokenization=preserve_tokenization, \
                                     sentence_separator=sentence_separator,\
                                     paragraph_separator=paragraph_separator,\
-                                    record_xml_filename=True)
+                                    record_xml_filename=True, \
+                                    orig_tokenization_layer_name_prefix=orig_tokenization_layer_name_prefix)
             for doc_id, doc in enumerate(docs):
                 if not create_empty_docs and len(doc.text) == 0:
                    # Skip an empty document
@@ -115,7 +123,8 @@ def iter_packed_xml(root_dir, focus_input_files=None, encoding='utf-8', \
                      add_tokenization=False, \
                      preserve_tokenization=False, \
                      sentence_separator='\n', \
-                     paragraph_separator='\n\n' ):
+                     paragraph_separator='\n\n',\
+                     orig_tokenization_layer_name_prefix='' ):
     """ Finds zipped (.zip and tar.gz) files from the directory root_dir, 
         unpacks XML TEI documents from zipped files, converts documents 
         to EstNLTK Text objects, and yields created Text objects.
@@ -165,6 +174,10 @@ def iter_packed_xml(root_dir, focus_input_files=None, encoding='utf-8', \
             of the text. The parameter value should be provided, None is not 
             allowed.
             (Default: '\n\n')
+        orig_tokenization_layer_name_prefix: str
+            Prefix that will be added to names of layers of original tokenization, 
+            if preserve_tokenization==True. 
+            (Default: '')
     """
     #global log
     files = os.listdir( root_dir )
@@ -184,7 +197,8 @@ def iter_packed_xml(root_dir, focus_input_files=None, encoding='utf-8', \
                                                              preserve_tokenization=preserve_tokenization, \
                                                              sentence_separator=sentence_separator,\
                                                              paragraph_separator=paragraph_separator,\
-                                                             record_xml_filename=True)
+                                                             record_xml_filename=True, \
+                                                             orig_tokenization_layer_name_prefix=orig_tokenization_layer_name_prefix)
                for doc_id, doc in enumerate(docs):
                    if not create_empty_docs and len(doc.text) == 0:
                       # Skip an empty document
@@ -198,21 +212,29 @@ def iter_packed_xml(root_dir, focus_input_files=None, encoding='utf-8', \
 #
 
 # function that keeps the original text without splitting
-def to_text(text):
+def to_text(text, layer_prefix=''):
     yield text, None, None
 
 # function that splits the original text into paragraphs
-def to_paragraphs(text):
-    for para_nr, para in enumerate(split_by(text, layer='paragraphs',
-                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences']), start=1):
+def to_paragraphs(text, layer_prefix=''):
+    for para_nr, para in enumerate(split_by(text, layer=layer_prefix+'paragraphs',
+                                            layers_to_keep=[layer_prefix+'tokens', 
+                                                            layer_prefix+'compound_tokens', 
+                                                            layer_prefix+'words', 
+                                                            layer_prefix+'sentences']), start=1):
         yield para, para_nr, None
 
 # function that splits the original text into sentences
-def to_sentences(text):
+def to_sentences(text, layer_prefix=''):
     sent_nr = 0
-    for para_nr, para in enumerate(split_by(text, layer='paragraphs',
-                                            layers_to_keep=['tokens', 'compound_tokens', 'words', 'sentences']), start=1):
-        for sent in split_by(para, layer='sentences', layers_to_keep=['tokens', 'compound_tokens', 'words']):
+    for para_nr, para in enumerate(split_by(text, layer=layer_prefix+'paragraphs',
+                                            layers_to_keep=[layer_prefix+'tokens', 
+                                                            layer_prefix+'compound_tokens', 
+                                                            layer_prefix+'words', 
+                                                            layer_prefix+'sentences']), start=1):
+        for sent in split_by(para, layer=layer_prefix+'sentences', layers_to_keep=[layer_prefix+'tokens', 
+                                                                                   layer_prefix+'compound_tokens', 
+                                                                                   layer_prefix+'words']):
             sent_nr += 1
             yield sent, para_nr, sent_nr
 
@@ -220,6 +242,7 @@ def to_sentences(text):
 def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   encoding='utf-8', create_empty_docs=False, logger=None, \
                   tokenization=None, use_sentence_sep_newlines=False, \
+                  orig_tokenization_layer_name_prefix='', \
                   splittype='no_splitting', metadata_extent='complete', \
                   buffer_size = 1000, insert_query_size = 5000000, \
                   skippable_documents=None ):
@@ -262,6 +285,10 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                             be preserved in layers of the text; 
             * 'estnltk'  -- text's original tokenization will be 
                             overwritten by estnltk's tokenization;
+        orig_tokenization_layer_name_prefix: str
+            Prefix that will be added to names of layers of original 
+            tokenization, if tokenization=='preserve'. 
+            (Default: '')
         use_sentence_sep_newlines: boolean
             If set, then during the reconstruction of a text string, 
             sentences from the original XML mark-up will always 
@@ -335,11 +362,11 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     # split before the insertion
     split = to_text
     if args.splittype == 'no_splitting':
-        split = to_text
+        split = partial( to_text, layer_prefix=orig_tokenization_layer_name_prefix )
     elif args.splittype == 'sentences':
-       split = to_sentences
+       split = partial( to_sentences, layer_prefix=orig_tokenization_layer_name_prefix )
     elif args.splittype == 'paragraphs':
-       split = to_paragraphs
+       split = partial( to_paragraphs, layer_prefix=orig_tokenization_layer_name_prefix )
     last_xml_file = ''
     doc_id = 1
     total_insertions    = 0
@@ -347,6 +374,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     with collection.buffered_insert(buffer_size=buffer_size, query_length_limit=insert_query_size) as buffered_insert:
         for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
                                 create_empty_docs=create_empty_docs, \
+                                orig_tokenization_layer_name_prefix=orig_tokenization_layer_name_prefix, \
                                 add_tokenization=add_tokenization, preserve_tokenization=preserve_tokenization,\
                                 sentence_separator=sentence_separator, paragraph_separator=paragraph_separator):
             # Get subcorpus name
@@ -645,6 +673,11 @@ if __name__ == '__main__':
                              "(default: none)",\
                         choices=['none', 'preserve', 'estnltk'], \
                         default='none' )
+    parser.add_argument('-p', '--layer_prefix', dest='original_layer_prefix', default = '', \
+                        help='specifies prefix (string) that will be added to names of layers that \n'+\
+                             'contain original tokenization from the XML files. The prefix is only\n'+\
+                             'added to layer names iff --tokenization preserve is turned on.\n'+\
+                             '(default: "")\n')
     parser.add_argument('--splittype', dest='splittype', action='store',
                         default='no_splitting', choices=['no_splitting', 'sentences', 'paragraphs'],
                         help='specifies if and how the source texts should be split before\n'+
@@ -813,6 +846,7 @@ if __name__ == '__main__':
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
                   focus_input_files=focus_input_files, buffer_size=args.buffer_size, \
                   insert_query_size=args.insert_query_size, \
+                  orig_tokenization_layer_name_prefix=args.original_layer_prefix, \
                   skippable_documents=docs_already_in_db)
     storage.close()
     time_diff = datetime.now() - startTime
