@@ -244,7 +244,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                   tokenization=None, use_sentence_sep_newlines=False, \
                   orig_tokenization_layer_name_prefix='', \
                   splittype='no_splitting', metadata_extent='complete', \
-                  buffer_size = 1000, insert_query_size = 5000000, \
+                  insert_query_size = 5000000, \
                   skippable_documents=None ):
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
@@ -312,8 +312,6 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
             specifies to which extent created Text object should be 
             populated with metadata. 
             (default: 'complete')
-        buffer_size: int (default: 1000)
-            buffer_size used during the database insert;
         insert_query_size: int (default: 5000000)
             maximum insert query size used during the database insert;
         skippable_documents: set of str (default: None)
@@ -371,7 +369,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     doc_id = 1
     total_insertions    = 0
     xml_files_processed = 0
-    with collection.buffered_insert(buffer_size=buffer_size, query_length_limit=insert_query_size) as buffered_insert:
+    with collection.buffered_insert(query_length_limit=insert_query_size) as buffered_insert:
         for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
                                 create_empty_docs=create_empty_docs, \
                                 orig_tokenization_layer_name_prefix=orig_tokenization_layer_name_prefix, \
@@ -620,10 +618,10 @@ if __name__ == '__main__':
                         help='collection owner (default: None)')
     parser.add_argument('--mode', dest='mode', action='store', choices=['overwrite', 'append'],
                         help='required if the collection already exists')
-    parser.add_argument('-b', '--buffer_size', dest='buffer_size', type=int, default=1000,
-                        help='buffer size in buffered database insert (default: 1000)')
     parser.add_argument('-q', '--insert_query_size', dest='insert_query_size', type=int, default=5000000,
-                        help='maximum insert query size in buffered database insert (default: 5000000)')
+                        help='Maximum number of bytes/symbols allowed in database insert.\n'+
+                             'The insertion buffer is flushed every time this maximum gets exceeded.\n'+
+                             '(default: 5000000)')
     parser.add_argument('-s', '--skip_existing', dest='skip_existing', \
                         default=False, \
                         action='store_true', \
@@ -676,7 +674,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--layer_prefix', dest='original_layer_prefix', default = '', \
                         help='specifies prefix (string) that will be added to names of layers that \n'+\
                              'contain original tokenization from the XML files. The prefix is only\n'+\
-                             'added to layer names iff --tokenization preserve is turned on.\n'+\
+                             'added to layer names iff flag --tokenization preserve is used.\n'+\
                              '(default: "")\n')
     parser.add_argument('--splittype', dest='splittype', action='store',
                         default='no_splitting', choices=['no_splitting', 'sentences', 'paragraphs'],
@@ -754,8 +752,6 @@ if __name__ == '__main__':
     if args.splittype != 'no_splitting':
        if args.tokenization == 'none':
           raise Exception('(!) splittype '+str(args.splittype)+' cannot be used without tokenization!')
-    if args.buffer_size and args.buffer_size < 0:
-       parser.error("Minimum buffer_size is 0")
     if args.insert_query_size and args.insert_query_size < 50:
        parser.error("Minimum insert_query_size is 50")
        
@@ -844,8 +840,7 @@ if __name__ == '__main__':
                   create_empty_docs=False, logger=log, tokenization=args.tokenization,\
                   use_sentence_sep_newlines=args.use_sentence_sep_newlines, \
                   splittype=args.splittype, metadata_extent=args.metadata_extent, \
-                  focus_input_files=focus_input_files, buffer_size=args.buffer_size, \
-                  insert_query_size=args.insert_query_size, \
+                  focus_input_files=focus_input_files, insert_query_size=args.insert_query_size, \
                   orig_tokenization_layer_name_prefix=args.original_layer_prefix, \
                   skippable_documents=docs_already_in_db)
     storage.close()
