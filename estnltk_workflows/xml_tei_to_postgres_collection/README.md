@@ -39,9 +39,9 @@ In order to import the Estonian Reference Corpus (_Eesti keele koondkorpus_) int
 
   Note that you can also just proceed with the packed files, because processing scripts can deal with both packed and unpacked XML files.
 
-**3.** (_Optional_) Use the script  **`split_corpus_files_into_subsets.py`** for splitting the set of XML files from the first step into N smaller subsets. This will enable parallel processing of the subsets in the step **4**.
+**3.** (_Optional_) Use the script  **`split_koondkorpus_files_into_subsets.py`** for splitting the set of XML files from the first step into N smaller subsets. This will enable parallel processing of the subsets in the step **4**.
 
-Note that the script works with both zipped and unzipped files. For detailed help, run: `python split_corpus_files_into_subsets.py -h`
+Note that the script works with both zipped and unzipped files. For detailed help, run: `python split_koondkorpus_files_into_subsets.py -h`
 
 **4.** Proceed with the script **`store_koondkorpus_in_pgcollection.py`**. This script loads _Koondkorpus_ XML TEI files (either from zipped archives, or from directories where the files have been unpacked), creates EstNLTK Text objects based on these files, adds tokenization to Texts (optional), splits Texts into paragraphs or sentences (optional), and stores Texts in a PostgreSQL collection. Optionally, you may want to evoke N instances of 
 `store_koondkorpus_in_pgcollection.py` for faster processing.
