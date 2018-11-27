@@ -23,8 +23,8 @@ from datetime import timedelta
 from estnltk.corpus_processing.parse_ettenten import extract_doc_ids_from_corpus_file
 
 
-def save_file_names( files_list, out_fnm ):
-    ''' Saves the list of file names into the file out_fnm.
+def save_doc_ids( files_list, out_fnm ):
+    ''' Saves the list of document ids into the file out_fnm.
         Overwrites existing files.
     '''
     with open(out_fnm, 'w', encoding='utf-8') as f:
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         groups = []
         for i in range(nr_of_splits):
             groups.append([])
-        # *** Split xml file names into groups
+        # *** Split document id-s into groups
         j = 0
         processed = 0
         for doc_id in extract_doc_ids_from_corpus_file( in_file ):
@@ -83,7 +83,7 @@ if __name__ == '__main__':
         for i in range(nr_of_splits):
             out_fnm = fnm+'__'+str(i+1)+'_of_'+str(nr_of_splits)+'.txt'
             print(' --> '+out_fnm+' ('+str(len(groups[i]))+' items)')
-            save_file_names( groups[i], out_fnm )
+            save_doc_ids( groups[i], out_fnm )
         # Report final statistics about the processing
         print(' Total',processed,'documents listed.')
         time_diff = datetime.now() - startTime
