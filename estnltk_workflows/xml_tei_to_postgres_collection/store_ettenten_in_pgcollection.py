@@ -1,6 +1,6 @@
 #
-#   Loads the content of "etTenTen.vert" (or "ettenten13.processed.prevert"), creates 
-#  EstNLTK Text objects based on these files, adds tokenization to Texts (optional), 
+#   Loads etTenTen 2013 corpus from a file ("etTenTen.vert" or "ettenten13.processed.prevert"),
+#  creates EstNLTK Text objects based on etTenTen's documents, adds tokenization to Texts (optional), 
 #  and stores Texts in a PostgreSQL collection.
 # 
 
@@ -26,7 +26,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
                   encoding='utf-8', discard_empty_paragraphs=True, logger=None, \
                   tokenization=None, insert_query_size = 5000000, \
                   skippable_documents=None, doc_id_to_texttype=None ):
-    """ Reads etTenTen corpus from in_file, extracts documents and 
+    """ Reads etTenTen 2013 corpus from in_file, extracts documents and 
         reconstructs corresponding Text objects, and stores the results 
         in given database collection.
         Optionally, adds tokenization layers to created Text objects.
@@ -71,7 +71,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
             that have already been processed and inserted into the 
             database. All documents inside this set will skipped.
             A web document is a string in the format:
-               web_doc_id + ':' + 
+               original_doc_id + ':' + 
                subdocument_number + ':' + 
                paragraph_number + ':' + 
                sentence_number
@@ -105,7 +105,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
            preserve_tokenization = False
 
     doc_nr = 1
-    last_web_doc_id  = None
+    last_original_doc_id  = None
     total_insertions = 0
     docs_processed   = 0
     with collection.buffered_insert(query_length_limit=insert_query_size) as buffered_insert:
@@ -115,13 +115,13 @@ def process_files(in_file, collection, focus_doc_ids=None,\
                                               add_tokenization=add_tokenization, \
                                               store_paragraph_attributes=True, \
                                               paragraph_separator='\n\n' ):
-            # Rename id to web_doc_id (to avoid confusion with DB id-s)
-            web_doc_id = web_doc.meta.get('id')
-            web_doc.meta['web_doc_id'] = web_doc_id
+            # Rename id to original_doc_id (to avoid confusion with DB id-s)
+            original_doc_id = web_doc.meta.get('id')
+            web_doc.meta['original_doc_id'] = original_doc_id
             del web_doc.meta['id']
             
             # Reset subdocument counter (if required)
-            if last_web_doc_id != web_doc_id:
+            if last_original_doc_id != original_doc_id:
                 doc_nr = 1
             
             # Delete original_paragraphs layer (if tokenization == None)
@@ -129,8 +129,8 @@ def process_files(in_file, collection, focus_doc_ids=None,\
                 delattr(web_doc, 'original_paragraphs') # Remove layer from the text
 
             # Add texttype (if mapping is available)
-            if doc_id_to_texttype and web_doc_id in doc_id_to_texttype:
-                web_doc.meta['texttype'] = doc_id_to_texttype[web_doc_id]
+            if doc_id_to_texttype and original_doc_id in doc_id_to_texttype:
+                web_doc.meta['texttype'] = doc_id_to_texttype[original_doc_id]
             
             # Gather metadata
             meta = {}
@@ -138,8 +138,8 @@ def process_files(in_file, collection, focus_doc_ids=None,\
                 meta[key] = value
 
             # Create an identifier of the insertable chunk:
-            #  web_doc_id + ':' + subdocument_number (+ ':' + paragraph_number + ':' + sentence_number)
-            file_chunk_lst = [web_doc.meta['web_doc_id']]
+            #  original_doc_id + ':' + subdocument_number (+ ':' + paragraph_number + ':' + sentence_number)
+            file_chunk_lst = [web_doc.meta['original_doc_id']]
             file_chunk_lst.append(':')
             file_chunk_lst.append(str(doc_nr))
             file_chunk_str = ''.join( file_chunk_lst )
@@ -161,7 +161,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
                else:
                   logger.debug((' {}:{} skipped (already in the database).').format(meta['web_domain'], file_chunk_str))
             doc_nr += 1
-            last_web_doc_id = web_doc_id
+            last_original_doc_id = original_doc_id
             docs_processed += 1
             #print('.', end = '')
             #sys.stdout.flush()
@@ -203,7 +203,7 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
     """ Fetches names of existing / skippable documents from the PostgreSQL storage.
         Returns a set of existing document names.
         A document name is represented as a string in the format:
-               web_doc_id + ':' + 
+               original_doc_id + ':' + 
                subdocument_number + ':' + 
                paragraph_number + ':' + 
                sentence_number
@@ -231,9 +231,9 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
     """
     # Filter fields: keep only fields that correspond to the fields of 
     # the current table
-    query_fields = ['web_doc_id', 'id', 'paragraph_nr', 'sentence_nr']
+    query_fields = ['original_doc_id', 'id', 'paragraph_nr', 'sentence_nr']
     query_fields = [f for f in query_fields if f == 'id' or f in meta_fields.keys()]
-    prev_web_doc_id = None
+    prev_original_doc_id = None
     subdocument_nr  = 1
     file_chunks_in_db = set()
     # Construct the query
@@ -250,15 +250,15 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
             finally:
                 logger.debug(read_cursor.query.decode())
             for items in read_cursor:
-                web_doc_id = str(items[0])
+                original_doc_id = str(items[0])
                 doc_id     = items[1]
-                if prev_web_doc_id and prev_web_doc_id != web_doc_id:
+                if prev_original_doc_id and prev_original_doc_id != original_doc_id:
                     # Reset web document id (in case of a new document)
                     subdocument_nr = 1
                 paragraph_nr = items[3] if 'paragraph_nr' in query_fields else None
                 sentence_nr  = items[4] if 'sentence_nr' in query_fields else None
                 # Reconstruct file name chunk
-                file_chunk_lst = [str(web_doc_id)]
+                file_chunk_lst = [str(original_doc_id)]
                 file_chunk_lst.append(':')
                 file_chunk_lst.append(str(subdocument_nr))
                 if paragraph_nr:
@@ -274,7 +274,7 @@ def fetch_skippable_documents( storage, schema, collection, meta_fields, logger 
                 assert file_chunk_str not in file_chunks_in_db, \
                     ' (!) Document chunk {!r} appears more than once in database.'.format(file_chunk_str)
                 file_chunks_in_db.add( file_chunk_str )
-                prev_web_doc_id = str(web_doc_id)
+                prev_original_doc_id = str(original_doc_id)
                 subdocument_nr += 1
     return file_chunks_in_db
 
@@ -457,7 +457,7 @@ if __name__ == '__main__':
     # Collect required database meta fields
     # An example of doc tag (metadata in attribs)
     #   <doc id="5" length=" 10k-100k" crawl_date="2013-01-10" url="http://blog.vm.ee/" web_domain="blog.vm.ee" langdiff="0.40" texttype="blog">
-    fields = [ ('web_doc_id', 'bigint') ]
+    fields = [ ('original_doc_id', 'bigint') ]
     fields.append( ('url', 'str') )
     fields.append( ('web_domain', 'str') )
     fields.append( ('crawl_date', 'str') )
