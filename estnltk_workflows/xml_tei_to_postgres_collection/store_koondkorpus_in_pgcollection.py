@@ -739,9 +739,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if not os.path.isdir(args.rootdir):
-       print('(!) Argument rootdir should be a directory')
-       parser.print_help()
-       exit(1)
+       parser.error('(!) Argument rootdir should be a directory')
     doc_iterator = None 
     if args.input_format == 'zipped':
        doc_iterator = iter_packed_xml
@@ -754,7 +752,6 @@ if __name__ == '__main__':
           raise Exception('(!) splittype '+str(args.splittype)+' cannot be used without tokenization!')
     if args.insert_query_size and args.insert_query_size < 50:
        parser.error("Minimum insert_query_size is 50")
-       
     
     logger.setLevel( (args.logging).upper() )
     log = logger
