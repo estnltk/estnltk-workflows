@@ -249,6 +249,8 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     """ Uses given doc_iterator (iter_packed_xml or iter_unpacked_xml) to
         extract texts from the files in the folder root_dir.
         Optionally, adds tokenization layers to created Text objects.
+        Extracted Text objects will be stored in given PostgreSQL 
+        collection.
     
         Parameters
         ----------
@@ -369,7 +371,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
     doc_id = 1
     total_insertions    = 0
     xml_files_processed = 0
-    with collection.buffered_insert(query_length_limit=insert_query_size) as buffered_insert:
+    with collection.insert(query_length_limit=insert_query_size) as buffered_insert:
         for doc in doc_iterator(rootdir, focus_input_files=focus_input_files, encoding=encoding, \
                                 create_empty_docs=create_empty_docs, \
                                 orig_tokenization_layer_name_prefix=orig_tokenization_layer_name_prefix, \
