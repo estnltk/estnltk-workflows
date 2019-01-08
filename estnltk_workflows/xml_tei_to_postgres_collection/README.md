@@ -1,4 +1,9 @@
-# Workflow: importing Estonian Reference Corpus (1990-2008) to a PostgreSQL database
+# Workflows: importing large corpora to a PostgreSQL database
+
+This folder contains command line workflows for importing large corpora -- the _Estonian Reference Corpus_ and the _etTenTen corpus_ -- with EstNLTK and saving into a PostgreSQL database. 
+You can use these scripts if you need a basic pipeline for importing these corpora into a database.
+
+## Workflow 1: importing Estonian Reference Corpus (1990-2008) 
 
 In order to import the Estonian Reference Corpus (_Eesti keele koondkorpus_) into a PostgreSQL database with EstNLTK, proceed in the following steps:
 
@@ -47,4 +52,19 @@ Note that the script works with both zipped and unzipped files. For detailed hel
 `store_koondkorpus_in_pgcollection.py` for faster processing.
 
 For detailed help about the command, run: `python store_koondkorpus_in_pgcollection.py -h`
+
+
+## Workflow 2: importing the etTenTen corpus (2013)
+
+For importing the etTenTen corpus (aka _Eesti veeb 2013_, _Veebikorpus13_, _Estonian Web 2013_, or _etWaC 2013_) with EstNLTK 1.6.x, please proceed in the following steps:
+
+**1.** Download and unpack the corpus, e.g. from here: [https://metashare.ut.ee/repository/browse/ettenten-korpus-toortekst/b564ca760de111e6a6e4005056b4002419cacec839ad4b7a93c3f7c45a97c55f](https://metashare.ut.ee/repository/browse/ettenten-korpus-toortekst/b564ca760de111e6a6e4005056b4002419cacec839ad4b7a93c3f7c45a97c55f)
+
+You should get a large file with the extension _vert_ or _prevert_ (e.g. `ettenten13.processed.prevert`). 
+
+**2.** (_Optional_) Use the script  **`split_ettenten_files_into_subsets.py`** for splitting the large file into N smaller subsets of documents. This will enable parallel processing of the subsets in the step **3**.
+
+**3.** Proceed with the script **`store_ettenten_in_pgcollection.py`**. This script loads etTenTen 2013 corpus from a file ("etTenTen.vert" or "ettenten13.processed.prevert"), creates EstNLTK Text objects based on etTenTen's documents, adds tokenization to Texts (optional), and stores Texts in a PostgreSQL collection. Optionally, you may want to evoke N instances of `store_ettenten_in_pgcollection.py` for faster processing.
+
+For detailed help about the command, run: `python store_ettenten_in_pgcollection.py -h`
 
