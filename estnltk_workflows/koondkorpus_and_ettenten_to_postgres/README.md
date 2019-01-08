@@ -1,4 +1,4 @@
-# Workflows: importing large corpora to a PostgreSQL database
+# Workflows: importing large corpora into a PostgreSQL database
 
 This folder contains command line workflows for importing large corpora -- the _Estonian Reference Corpus_ and the _etTenTen corpus_ -- with EstNLTK and saving into a PostgreSQL database. 
 You can use these scripts if you need a basic pipeline for importing these corpora into a database.
