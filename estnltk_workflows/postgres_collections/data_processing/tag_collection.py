@@ -18,10 +18,10 @@ def tag_collection(tagger, args):
     overwrite = (args.mode == 'overwrite')
 
     try:
-        collection.create_layer_buffered(tagger=tagger,
-                                         overwrite=overwrite,
-                                         progressbar=args.progressbar
-                                         )
+        collection.create_layer(tagger=tagger,
+                                overwrite=overwrite,
+                                progressbar=args.progressbar
+                                )
     except Exception as e:
         logger.error(e)
         exit(1)

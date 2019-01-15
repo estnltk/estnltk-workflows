@@ -35,7 +35,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
         ----------
         in_file: str
            Full name of etTenTen corpus file (name with path);
-        collection:  estnltk.storage.postgres.db.PgCollection
+        collection:  estnltk.storage.postgres.collection.PgCollection
             EstNLTK's PgCollection where extracted Texts should be 
             stored;
         focus_doc_ids: set of str
@@ -108,7 +108,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
     last_original_doc_id  = None
     total_insertions = 0
     docs_processed   = 0
-    with collection.buffered_insert(query_length_limit=insert_query_size) as buffered_insert:
+    with collection.insert(query_length_limit=insert_query_size) as buffered_insert:
         for web_doc in parse_ettenten_corpus_file_iterator( in_file, encoding=encoding, \
                                               focus_doc_ids=focus_doc_ids, \
                                               discard_empty_paragraphs=discard_empty_paragraphs, \

@@ -47,6 +47,7 @@ from estnltk import logger
 from estnltk.converters import dict_to_text
 from estnltk.storage.postgres import PostgresStorage
 from estnltk.layer_operations import split_by
+from estnltk.storage.postgres import table_exists
 
 
 logger.setLevel(args.logging)
@@ -114,7 +115,7 @@ with storage.conn.cursor() as c:
         logger.debug('total number of rows in the chunk: {}'.format(total))
 
 
-if not storage.table_exists(table=source_table, schema=source_schema):
+if not table_exists(storage, source_table):
     logger.error('source table does not exist: "{}"."{}"'.format(source_schema, source_table))
     exit(1)
 
@@ -224,7 +225,7 @@ with storage.conn as conn:
 
         commit_interval = 2000
         fragment_counter = 0
-        with collection.buffered_insert(buffer_size=1000) as buffered_insert:
+        with collection.insert(buffer_size=1000) as buffered_insert:
             for s_id, source in iter_source:
                 iter_source.set_description('source_id: {}'.format(s_id), refresh=False)
 
