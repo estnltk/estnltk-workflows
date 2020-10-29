@@ -431,7 +431,7 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
                 if logger:
                    # Debugging stuff
                    # Listing of annotation layers added to Text
-                   with_layers = list(doc_fragment.layers.keys())
+                   with_layers = list(doc_fragment.layers)
                    if with_layers:
                       with_layers = ' with layers '+str(with_layers)
                    else:

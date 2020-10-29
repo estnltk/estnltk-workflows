@@ -3,6 +3,10 @@
 This folder contains command line workflows for importing large corpora -- the _Estonian Reference Corpus_ and the _etTenTen corpus_ -- with EstNLTK and saving into a PostgreSQL database. 
 You can use these scripts if you need a basic pipeline for importing these corpora into a database.
 
+_Note_: for using these workflows, you need [**Psycopg 2**](http://initd.org/psycopg) package that allows to communicate with PostgreSQL database. Installation:
+
+	conda install psycopg2
+
 ## Workflow 1: importing Estonian Reference Corpus (1990-2008) 
 
 In order to import the Estonian Reference Corpus (_Eesti keele koondkorpus_) into a PostgreSQL database with EstNLTK, proceed in the following steps:

@@ -151,7 +151,7 @@ def process_files(in_file, collection, focus_doc_ids=None,\
             if logger:
                # Debugging stuff
                # Listing of annotation layers added to Text
-               with_layers = list(web_doc.layers.keys())
+               with_layers = list(web_doc.layers)
                if with_layers:
                   with_layers = ' with layers '+str(with_layers)
                else:
