@@ -2,15 +2,13 @@
 #  Evaluates how changing Vabamorf's binary lexicons alters EstNLTK's morphological 
 #  annotations. 
 #
-#  Runs given Vabamorf's binary lexicons on a morphologically annotated PostgreSQL
-#  collection. 
+#  Runs VabamorfTagger with given Vabamorf's binary lexicons on the given morphologically 
+#  annotated PostgreSQL collection. 
 #  Compares collection's morphological annotations against new annotations produced 
-#  by VabamorfTagger with given binaries and finds all annotation differences.
+#  by VabamorfTagger and finds all annotation differences.
 #
-#  Outputs summarizing statistics and detailed annotation differences.
+#  Outputs summarized statistics and detailed annotation differences.
 #
-#  Status:
-#      work-in-progress
 #
 
 import os, sys
@@ -24,6 +22,7 @@ from datetime import timedelta
 
 from estnltk import logger
 from estnltk.storage.postgres import PostgresStorage
+from estnltk.storage.postgres import KeysQuery
 
 from estnltk.resolve_layer_dag import DEFAULT_RESOLVER
 from estnltk.vabamorf.morf import Vabamorf as VabamorfInstance
@@ -47,11 +46,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
        "Evaluates how changing Vabamorf's binary lexicons alters EstNLTK's morphological "+
        "annotations. \n"+
-       "Runs given Vabamorf's binary lexicons on a morphologically annotated PostgreSQL "+
-       "collection. "+
+       "Runs VabamorfTagger with given Vabamorf's binary lexicons on the given morphologically "+
+       "annotated PostgreSQL collection. "+
        "Compares collection's morphological annotations against new annotations produced "+
-       "by VabamorfTagger with given binaries. Finds all annotation differences. \n"+
-       "Outputs summarizing statistics and detailed annotation differences.")
+       "by VabamorfTagger. Finds all annotation differences. \n"+
+       "Outputs summarized statistics and detailed annotation differences.")
     # 1) Specification of the evaluation settings #1
     parser.add_argument('vm_bin_dir', type=str, \
                         help="directory containing Vabamorf's binary lexicons (files 'et.dct' and 'et3.dct') "+\
@@ -61,7 +60,7 @@ if __name__ == '__main__':
     parser.add_argument('morph_layer', type=str, \
                         help='name of the morph analysis layer to be evaluated against. '+\
                              'must be a layer of the input collection.')
-    # 2) Database access parameters
+    # 2) Database access & logging parameters
     parser.add_argument('--pgpass', dest='pgpass', action='store', \
                         default='~/.pgpass', \
                         help='name of the PostgreSQL password file (default: ~/.pgpass). '+\
@@ -71,6 +70,9 @@ if __name__ == '__main__':
                         help='name of the collection schema (default: public)')
     parser.add_argument('--role', dest='role', action='store',
                         help='role used for accessing the collection. the role must have a read access. (default: None)')
+    parser.add_argument('--logging', dest='logging', action='store', default='info',\
+                        choices=['debug', 'info', 'warning', 'error', 'critical'],\
+                        help='logging level (default: info)')
     # 3) Specification of the evaluation settings #2
     parser.add_argument('--new_morph_layer', dest='new_morph_layer', action='store', default='new_morph_analysis',\
                         help="name of the morph analysis layer created during the re-annotation "+
@@ -111,10 +113,6 @@ if __name__ == '__main__':
                              "difference evaluation. if specified, then the given amount of documents will be "+\
                              "processed (instead of processing the whole corpus). if the amount exceeds the "+\
                              "corpus size, then the whole corpus is processed. (default: None)" )
-    # 4) Logging parameters
-    parser.add_argument('--logging', dest='logging', action='store', default='info',\
-                        choices=['debug', 'info', 'warning', 'error', 'critical'],\
-                        help='logging level (default: info)')
     args = parser.parse_args()
 
     logger.setLevel( (args.logging).upper() )
@@ -195,8 +193,7 @@ if __name__ == '__main__':
             eval_layers = list(vm_tagger.input_layers) + [args.morph_layer]
             data_iterator = None
             if chosen_doc_ids:
-                # TODO: unforunately, this does not work with the current devel_1.6 code, because selecting by keys is broken there
-                data_iterator = collection.select( keys=chosen_doc_ids, progressbar='ascii', layers=eval_layers )
+                data_iterator = collection.select( KeysQuery(keys=chosen_doc_ids), progressbar='ascii', layers=eval_layers )
             else:
                 data_iterator = collection.select( progressbar='ascii', layers=eval_layers )
             for key, text in data_iterator:
@@ -229,7 +226,7 @@ if __name__ == '__main__':
                                                                                focus_attributes=focus_attributes )
                 # Record difference statistics
                 morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text['morph_diff_layer'], text_cat )
-                # 5) Visualize & output words with different annotations
+                # 5) Visualize & output words that have differences in annotations
                 formatted, morph_diff_gap_counter = \
                      format_morph_diffs_string( fname_stub, text, alignments, args.morph_layer+'_flat', \
                                                                   args.new_morph_layer+'_flat', \
@@ -237,7 +234,7 @@ if __name__ == '__main__':
                                                                   text_cat=text_cat, \
                                                                   focus_attributes=focus_attributes )
                 if formatted is not None:
-                    fpath = os.path.join(output_dir, f'_{output_file_prefix}__diff_gaps_{output_file_suffix}.txt')
+                    fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
                     write_formatted_diff_str_to_file( fpath, formatted )
                 
             summarizer_result_str = morph_diff_summarizer.get_diffs_summary_output( show_doc_count=True )
@@ -245,7 +242,7 @@ if __name__ == '__main__':
             time_diff = datetime.now() - startTime
             log.info('Total processing time: {}'.format(time_diff))
             # Write summarizer's results to output dir
-            fpath = os.path.join(output_dir, f'_{output_file_prefix}__diff_stats_{output_file_suffix}.txt')
+            fpath = os.path.join(output_dir, f'_{output_file_prefix}__stats_{output_file_suffix}.txt')
             with open(fpath, 'w', encoding='utf-8') as out_f:
                 out_f.write( 'TOTAL DIFF STATISTICS:'+os.linesep+summarizer_result_str )
                 out_f.write( 'Total processing time: {}'.format(time_diff) )

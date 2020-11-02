@@ -4,5 +4,5 @@ Scripts for evaluating morphological analysis annotations against previous versi
 
 Requirements: Python 3.6+, [Psycopg 2](https://www.psycopg.org), EstNLTK v1.6.7+
 
-* `eval_vm_bin.py` -- Evaluates how changing Vabamorf's binary lexicons alters EstNLTK's morphological annotations. Runs given Vabamorf's binary lexicons on a morphologically annotated PostgreSQL collection. Compares collection's morphological annotations against new annotations produced by VabamorfTagger with given binaries and finds all annotation differences. For detailed usage information, run: `python eval_vm_bin.py -h`
+* `diff_vm_bin.py` -- Runs VabamorfTagger with given Vabamorf's binary lexicons on a PostgreSQL collection, and finds differences in morphological annotations. Outputs summarized statistics about differences, writes all differences into a file. For detailed usage information, run: `python eval_vm_bin.py -h`
  
