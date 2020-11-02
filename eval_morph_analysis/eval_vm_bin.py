@@ -126,7 +126,7 @@ if __name__ == '__main__':
        "Compares collection's morphological annotations against new annotations produced "+
        "by VabamorfTagger with given binaries. Finds all annotation differences. \n"+
        "Outputs summarizing statistics and detailed annotation differences.")
-    # 1) Specification of the evaluation settings
+    # 1) Specification of the evaluation settings #1
     parser.add_argument('vm_bin_dir', type=str, \
                         help="directory containing Vabamorf's binary lexicons (files 'et.dct' and 'et3.dct') "+\
                              "that will be evaluated on the collection.")
@@ -135,6 +135,17 @@ if __name__ == '__main__':
     parser.add_argument('morph_layer', type=str, \
                         help='name of the morph analysis layer to be evaluated against. '+\
                              'must be a layer of the input collection.')
+    # 2) Database access parameters
+    parser.add_argument('--pgpass', dest='pgpass', action='store', \
+                        default='~/.pgpass', \
+                        help='name of the PostgreSQL password file (default: ~/.pgpass). '+\
+                             'the format of the file should be:  hostname:port:database:username:password ')
+    parser.add_argument('--schema', dest='schema', action='store',\
+                        default='public',\
+                        help='name of the collection schema (default: public)')
+    parser.add_argument('--role', dest='role', action='store',
+                        help='role used for accessing the collection. the role must have a read access. (default: None)')
+    # 3) Specification of the evaluation settings #2
     parser.add_argument('--new_morph_layer', dest='new_morph_layer', action='store', default='new_morph_analysis',\
                         help="name of the morph analysis layer created during the re-annotation "+
                              "of the collection with Vabamorf's new binary lexicons. "
@@ -153,18 +164,23 @@ if __name__ == '__main__':
                         help="a prefix that will be added to the output directory name. the output directory "+\
                              " name will be: this prefix concatenated with the name of the collection. "+\
                              "(default: 'diff_')" )
-    # 2) Database access parameters
-    parser.add_argument('--pgpass', dest='pgpass', action='store', \
-                        default='~/.pgpass', \
-                        help='name of the PostgreSQL password file (default: ~/.pgpass). '+\
-                             'the format of the file should be:  hostname:port:database:username:password ')
-    parser.add_argument('--schema', dest='schema', action='store',\
-                        default='public',\
-                        help='name of the collection schema (default: public)')
-    parser.add_argument('--role', dest='role', action='store',
-                        help='collection owner (default: None)')
-    
-    # 3) Logging parameters
+    parser.add_argument('--filename_key', dest='file_name_key', action='store', default='file',\
+                        help="name of the key in text object's metadata which conveys the original file "+\
+                             "name. if the key is specified and corresponding keys are available in "+\
+                             "metadata (of each text object), then each of the collection's document will be "+\
+                             "associated with its corresponding file name (that is: the file name will be the "+\
+                             "identifier of the document in the output). Otherwise, the identifier of the document "+\
+                             "in the output will be 'doc'+ID, where ID is document's numeric index in "+\
+                             "the collection. "+\
+                             "(default: 'fname')" )
+    parser.add_argument('--textcat_key', dest='text_cat_key', action='store', default='subcorpus',\
+                        help="name of the key in text object's metadata which conveys subcorpus "+\
+                             "or text category name. if the key is specified and corresponding keys are "+\
+                             "available in metadata (of each text object), then the evaluation / difference "+\
+                             "statistics will be recorded / collected subcorpus wise. Otherwise, no subcorpus "+\
+                             "distinction will be made in difference statistics and output. "+\
+                             "(default: 'subcorpus')" )
+    # 4) Logging parameters
     parser.add_argument('--logging', dest='logging', action='store', default='info',\
                         choices=['debug', 'info', 'warning', 'error', 'critical'],\
                         help='logging level (default: info)')
@@ -241,8 +257,15 @@ if __name__ == '__main__':
             
             eval_layers = list(vm_tagger.input_layers) + [args.morph_layer]
             for key, text in collection.select( progressbar='ascii', layers=eval_layers ):
+                # 0) Fetch document and subcorpus' identifiers
                 fname_stub = 'doc' + str(key)
-                text_cat   = 'corpus'
+                if args.file_name_key is not None:
+                    if args.file_name_key in text.meta.keys() and text.meta[args.file_name_key] is not None:
+                        fname_stub = text.meta[ args.file_name_key ]
+                text_cat = 'corpus'
+                if args.text_cat_key is not None:
+                    if args.text_cat_key in text.meta.keys() and text.meta[args.text_cat_key] is not None:
+                        text_cat = text.meta[ args.text_cat_key ]
                 # 1) Add new morph analysis annotations
                 vm_tagger.tag( text )
                 # 2) Create flat v1_6 morph analysis layers
@@ -271,7 +294,7 @@ if __name__ == '__main__':
                                                                   text_cat=text_cat, \
                                                                   focus_attributes=focus_attributes )
                 if formatted is not None:
-                    fpath = os.path.join(output_dir, f'_{output_file_prefix}_diff_gaps_{output_file_suffix}.txt')
+                    fpath = os.path.join(output_dir, f'_{output_file_prefix}__diff_gaps_{output_file_suffix}.txt')
                     write_formatted_diff_str_to_file( fpath, formatted )
                 
             summarizer_result_str = morph_diff_summarizer.get_diffs_summary_output( show_doc_count=True )
@@ -279,7 +302,7 @@ if __name__ == '__main__':
             time_diff = datetime.now() - startTime
             log.info('Total processing time: {}'.format(time_diff))
             # Write summarizer's results to output dir
-            fpath = os.path.join(output_dir, f'_{output_file_prefix}_diff_stats_{output_file_suffix}.txt')
+            fpath = os.path.join(output_dir, f'_{output_file_prefix}__diff_stats_{output_file_suffix}.txt')
             with open(fpath, 'w', encoding='utf-8') as out_f:
                 out_f.write( 'TOTAL DIFF STATISTICS:'+os.linesep+summarizer_result_str )
                 out_f.write( 'Total processing time: {}'.format(time_diff) )

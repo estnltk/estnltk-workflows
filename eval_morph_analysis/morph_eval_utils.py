@@ -254,7 +254,7 @@ def get_estnltk_morph_analysis_annotation_alignments( collected_diffs, layer_nam
                 for layer in layer_names:
                     if STATUS_ATTR in al[layer].keys():
                         del al[layer][STATUS_ATTR]
-    # Sanity check #2: check that we are consistent with counts in morph_diff_layer.meta:
+    # Sanity check #2: check that we are consistent with counts in morph_diff_layer:
     #   unchanged_annotations + missing_annotations = number_of_annotations_in_old_layer
     #   unchanged_annotations + extra_annotations   = number_of_annotations_in_new_layer
     normalized_extra_annotations   = 0
