@@ -117,6 +117,39 @@ def create_vm_tagger_based_on_vm_instance( old_morph_layer, collection, log, new
 
 
 
+def fetch_document_indexes( storage, schema, collection, logger ):
+    """ Fetches and returns all document ids of the collection from the PostgreSQL storage.
+    """
+    from psycopg2.sql import SQL, Identifier
+    # Construct the query
+    sql_str = 'SELECT id FROM {}.{} ORDER BY id'
+    doc_ids = []
+    with storage.conn as conn:
+        # Named cursors: http://initd.org/psycopg/docs/usage.html#server-side-cursors
+        with conn.cursor('read_collection_doc_ids', withhold=True) as read_cursor:
+            try:
+                read_cursor.execute(SQL(sql_str).format(Identifier(schema),
+                                                        Identifier(collection)))
+            except Exception as e:
+                logger.error(e)
+                raise
+            finally:
+                logger.debug(read_cursor.query.decode())
+            for items in read_cursor:
+                doc_ids.append ( items[0] )
+    return doc_ids
+
+
+
+def pick_random_doc_ids( k, storage, schema, collection, logger, sort=True ):
+    ''' Picks a random sample of k document ids from the given collection. '''
+    from random import sample
+    all_doc_ids = fetch_document_indexes( storage, args.schema, args.collection, logger )
+    resulting_sample = sample(all_doc_ids, k) if k < len(all_doc_ids) else all_doc_ids
+    return sorted(resulting_sample) if sort else resulting_sample
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
        "Evaluates how changing Vabamorf's binary lexicons alters EstNLTK's morphological "+
@@ -180,6 +213,11 @@ if __name__ == '__main__':
                              "statistics will be recorded / collected subcorpus wise. Otherwise, no subcorpus "+\
                              "distinction will be made in difference statistics and output. "+\
                              "(default: 'subcorpus')" )
+    parser.add_argument('--rand_pick', dest='rand_pick', action='store', type=int, \
+                        help="integer value specifying the amount of documents to be randomly chosen for "+\
+                             "difference evaluation. if specified, then the given amount of documents will be "+\
+                             "processed (instead of processing the whole corpus). if the amount exceeds the "+\
+                             "corpus size, then the whole corpus is processed. (default: None)" )
     # 4) Logging parameters
     parser.add_argument('--logging', dest='logging', action='store', default='info',\
                         choices=['debug', 'info', 'warning', 'error', 'critical'],\
@@ -231,6 +269,12 @@ if __name__ == '__main__':
                                                                               docs_in_collection ))
             log.debug(' Collection {!r} has layers: {!r} '.format( args.collection, 
                                                                    collection.layers ))
+            # Pick a random sample (instead of the whole corpus)
+            chosen_doc_ids = []
+            if args.rand_pick is not None and args.rand_pick > 0:
+                chosen_doc_ids = pick_random_doc_ids( args.rand_pick, storage, args.schema, args.collection, logger )
+                log.info(' Random sample of {!r} documents chosen for processing.'.format( len(chosen_doc_ids) ))
+            
             vm_tagger = create_vm_tagger_based_on_vm_instance( args.morph_layer, collection, log, \
                                                                args.new_morph_layer, new_lex_path, \
                                                                new_disamb_lex_path, \
@@ -256,7 +300,13 @@ if __name__ == '__main__':
             output_file_suffix = startTime.strftime('%Y-%m-%dT%H%M%S')
             
             eval_layers = list(vm_tagger.input_layers) + [args.morph_layer]
-            for key, text in collection.select( progressbar='ascii', layers=eval_layers ):
+            data_iterator = None
+            if chosen_doc_ids:
+                # TODO: unforunately, this does not work with the current devel_1.6 code, because selecting by keys is broken there
+                data_iterator = collection.select( keys=chosen_doc_ids, progressbar='ascii', layers=eval_layers )
+            else:
+                data_iterator = collection.select( progressbar='ascii', layers=eval_layers )
+            for key, text in data_iterator:
                 # 0) Fetch document and subcorpus' identifiers
                 fname_stub = 'doc' + str(key)
                 if args.file_name_key is not None:
