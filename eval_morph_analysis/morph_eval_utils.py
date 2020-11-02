@@ -133,7 +133,9 @@ def get_estnltk_morph_analysis_diff_annotations( text_obj, layer_a, layer_b, dif
     return collected_diffs
 
 
-def get_estnltk_morph_analysis_annotation_alignments( collected_diffs, layer_names, focus_attributes=['root','partofspeech', 'form'], remove_status=True ):
+def get_estnltk_morph_analysis_annotation_alignments( collected_diffs, layer_names, morph_diff_layer, \
+                                                                focus_attributes=['root','partofspeech', 'form'], \
+                                                                remove_status=True ):
     ''' Calculates annotation alignments between annotations in collected_diffs. '''
     assert isinstance(layer_names, list) and len(layer_names) == 2
     STATUS_ATTR = '__status'
@@ -226,7 +228,7 @@ def get_estnltk_morph_analysis_annotation_alignments( collected_diffs, layer_nam
                     al[MATCHING_ATTR] = []
                     alignment['alignments'].append( al )
             alignments.append( alignment )
-    # Sanity check: check that we haven't lost any annotations during the careful alignment
+    # Sanity check #1: check that we haven't lost any annotations during the careful alignment
     annotations_by_layer_2 = defaultdict(int)
     for word_diff in alignments:
         for al in word_diff['alignments']:
@@ -252,6 +254,33 @@ def get_estnltk_morph_analysis_annotation_alignments( collected_diffs, layer_nam
                 for layer in layer_names:
                     if STATUS_ATTR in al[layer].keys():
                         del al[layer][STATUS_ATTR]
+    # Sanity check #2: check that we are consistent with counts in morph_diff_layer.meta:
+    #   unchanged_annotations + missing_annotations = number_of_annotations_in_old_layer
+    #   unchanged_annotations + extra_annotations   = number_of_annotations_in_new_layer
+    normalized_extra_annotations   = 0
+    normalized_missing_annotations = 0
+    for diff_span in morph_diff_layer:
+        for status in diff_span.span_status:
+            if status == 'missing':
+                normalized_missing_annotations += 1
+            elif status == 'extra':
+                normalized_extra_annotations += 1
+    unchanged_annotations = morph_diff_layer.meta['unchanged_annotations']
+    missing_annotations   = morph_diff_layer.meta['missing_annotations'] - normalized_missing_annotations 
+    extra_annotations     = morph_diff_layer.meta['extra_annotations'] - normalized_extra_annotations
+    missing_annotations_2 = 0
+    extra_annotations_2   = 0
+    for word_alignment in alignments:
+        for annotation_alignment in word_alignment['alignments']:
+            if annotation_alignment['__status'] == 'MODIFIED':
+                missing_annotations_2 += 1
+                extra_annotations_2   += 1
+            elif annotation_alignment['__status'] == 'MISSING':
+                missing_annotations_2 += 1
+            elif annotation_alignment['__status'] == 'EXTRA':
+                extra_annotations_2 += 1
+    assert missing_annotations == missing_annotations_2
+    assert extra_annotations == extra_annotations_2
     return alignments
 
 

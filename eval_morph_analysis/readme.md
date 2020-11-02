@@ -1,6 +1,6 @@
-# Evaluating morphological annotations against previous versions
+# Evaluating morphological annotations against previous versions of the annotations
 
-This folder contains scripts for evaluating morphological analysis annotations against previous versions of the annotations.
+Scripts for evaluating morphological analysis annotations against previous versions of the annotations available in a PostgreSQL collection.
 
 Requirements: Python 3.6+, [Psycopg 2](https://www.psycopg.org), EstNLTK v1.6.7+
 

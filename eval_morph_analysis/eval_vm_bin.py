@@ -259,6 +259,7 @@ if __name__ == '__main__':
                 flat_morph_layers = [args.morph_layer+'_flat', args.new_morph_layer+'_flat']
                 focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
                 alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
+                                                                               text['morph_diff_layer'],
                                                                                focus_attributes=focus_attributes )
                 # Record difference statistics
                 morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text['morph_diff_layer'], text_cat )
