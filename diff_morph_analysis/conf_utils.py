@@ -147,3 +147,24 @@ def create_vm_tagger_based_on_vm_instance( old_morph_layer, collection, log, new
     return vm_tagger
 
 
+def create_vm_tagger( old_morph_layer, collection, log, new_morph_layer, \
+                                       incl_prefix='', incl_suffix='', \
+                                       **kwargs ):
+    ''' Creates VabamorfTagger based on given analysis settings (**kwargs). 
+        Supported parameters: 'guess', 'propername', 'disambiguate', 'compound', 
+        'phonetic', 'slang_lex'. If kwargs is not specified, then creates 
+        VabamorfTagger with default settings. 
+        Fixes input layers of the tagger based on the layers available 
+        in the given collection. '''
+    default_vm_tagger = DEFAULT_RESOLVER.taggers.rules['morph_analysis']
+    vmtagger_input_args = \
+        find_morph_analysis_dependency_layers( default_vm_tagger,old_morph_layer,collection,log,
+                                               incl_prefix=incl_prefix, incl_suffix=incl_suffix )
+    vmtagger_input_args['output_layer'] = new_morph_layer
+    for kwarg in kwargs.keys():
+        if kwarg in ['guess', 'propername', 'disambiguate', 'compound', 'phonetic', 'slang_lex']:
+            vmtagger_input_args[kwarg] = kwargs.get(kwarg)
+    vm_tagger = VabamorfTagger( **vmtagger_input_args )
+    log.info(' Initialized {!r} for evaluation. '.format( vm_tagger) )
+    return vm_tagger
+

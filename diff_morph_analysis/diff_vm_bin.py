@@ -6,7 +6,7 @@
 #  file. The output will be written into a directory named 'diff_' + collection's name.
 #
 
-import os, sys
+import os, sys, re
 import os.path
 import argparse
 
@@ -34,7 +34,7 @@ from morph_eval_utils import MorphDiffSummarizer
 
 from conf_utils import create_vm_tagger_based_on_vm_instance
 from conf_utils import pick_random_doc_ids
-
+from conf_utils import create_vm_tagger
 
 
 if __name__ == '__main__':
@@ -47,7 +47,8 @@ if __name__ == '__main__':
     # 1) Specification of the evaluation settings #1
     parser.add_argument('vm_bin_dir', type=str, \
                         help="directory containing Vabamorf's binary lexicons (files 'et.dct' and 'et3.dct') "+\
-                             "that will be evaluated on the collection.")
+                             "that will be evaluated on the collection. Note: if the value is string '....', "+\
+                             "then VabamorfTagger's default binary lexicons will be evaluated.")
     parser.add_argument('collection', type=str, \
                         help='name of the collection on which the evaluation will be performed.')
     parser.add_argument('morph_layer', type=str, \
@@ -117,27 +118,29 @@ if __name__ == '__main__':
     try:
 
         # Check input arguments:  vm_bin_dir
-        if not os.path.exists(args.vm_bin_dir) or not os.path.isdir(args.vm_bin_dir):
-            log.error("(!) Invalid Vabamorf's binaries directory (vm_bin_dir): {!r}".format(args.vm_bin_dir))
-            parser.print_usage()
-            exit(1)
-        
-        # Check for existence of binary files
         new_lex_path        = 'et.dct'
         new_disamb_lex_path = 'et3.dct'
-        new_lex_path        = os.path.join(args.vm_bin_dir, new_lex_path)
-        new_disamb_lex_path = os.path.join(args.vm_bin_dir, new_disamb_lex_path)
+        if not re.match('^\.{3,}$', args.vm_bin_dir):
+            if not os.path.exists(args.vm_bin_dir) or not os.path.isdir(args.vm_bin_dir):
+                log.error("(!) Invalid Vabamorf's binaries directory (vm_bin_dir): {!r}".format(args.vm_bin_dir))
+                parser.print_usage()
+                exit(1)
+            
+            # Check for existence of binary files
+            new_lex_path        = os.path.join(args.vm_bin_dir, new_lex_path)
+            new_disamb_lex_path = os.path.join(args.vm_bin_dir, new_disamb_lex_path)
+            
+            if not os.path.isfile( new_lex_path ):
+                log.error("(!) Invalid vm_bin_dir {!r}".format(args.vm_bin_dir))
+                log.error("(!) Missing Vabamorf's binary lexicon file: {!r}".format(new_lex_path))
+                parser.print_usage()
+                exit(1)
+            if not os.path.isfile( new_disamb_lex_path ):
+                log.error("(!) Invalid vm_bin_dir {!r}".format(args.vm_bin_dir))
+                log.error("(!) Missing Vabamorf's binary lexicon file: {!r}".format(new_disamb_lex_path))
+                parser.print_usage()
+                exit(1)
         
-        if not os.path.isfile( new_lex_path ):
-            log.error("(!) Invalid vm_bin_dir {!r}".format(args.vm_bin_dir))
-            log.error("(!) Missing Vabamorf's binary lexicon file: {!r}".format(new_lex_path))
-            parser.print_usage()
-            exit(1)
-        if not os.path.isfile( new_disamb_lex_path ):
-            log.error("(!) Invalid vm_bin_dir {!r}".format(args.vm_bin_dir))
-            log.error("(!) Missing Vabamorf's binary lexicon file: {!r}".format(new_disamb_lex_path))
-            parser.print_usage()
-            exit(1)
         # Check layer names
         if args.morph_layer == args.new_morph_layer:
             log.error("(!) Invalid layer names: morph_layer cannot be identical to new_morph_layer: {!r}".format(args.morph_layer))
@@ -159,11 +162,20 @@ if __name__ == '__main__':
                 chosen_doc_ids = pick_random_doc_ids( args.rand_pick, storage, args.schema, args.collection, logger )
                 log.info(' Random sample of {!r} documents chosen for processing.'.format( len(chosen_doc_ids) ))
             
-            vm_tagger = create_vm_tagger_based_on_vm_instance( args.morph_layer, collection, log, \
-                                                               args.new_morph_layer, new_lex_path, \
-                                                               new_disamb_lex_path, \
-                                                               incl_prefix=args.in_prefix, \
-                                                               incl_suffix=args.in_suffix )
+            if not re.match('^\.{3,}$', args.vm_bin_dir):
+                # Create VabamorfTagger based on given binary lexicon files
+                vm_tagger = create_vm_tagger_based_on_vm_instance( args.morph_layer, collection, log, \
+                                                                   args.new_morph_layer, new_lex_path, \
+                                                                   new_disamb_lex_path, \
+                                                                   incl_prefix=args.in_prefix, \
+                                                                   incl_suffix=args.in_suffix )
+            else:
+                # Create VabamorfTagger with default settings
+                vm_tagger = create_vm_tagger( args.morph_layer, collection, log, \
+                                              args.new_morph_layer, 
+                                              incl_prefix=args.in_prefix, \
+                                              incl_suffix=args.in_suffix )
+            
             morph_diff_tagger = DiffTagger(layer_a = args.morph_layer+'_flat',
                                            layer_b = args.new_morph_layer+'_flat',
                                            output_layer='morph_diff_layer',
