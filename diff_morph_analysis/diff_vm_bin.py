@@ -1,14 +1,9 @@
 #
-#  Evaluates how changing Vabamorf's binary lexicons alters EstNLTK's morphological 
-#  annotations. 
-#
-#  Runs VabamorfTagger with given Vabamorf's binary lexicons on the given morphologically 
-#  annotated PostgreSQL collection. 
-#  Compares collection's morphological annotations against new annotations produced 
-#  by VabamorfTagger and finds all annotation differences.
-#
-#  Outputs summarized statistics and detailed annotation differences.
-#
+#  Runs VabamorfTagger with given Vabamorf's binary lexicons on given morphologically 
+#  annotated PostgreSQL collection, and finds differences in morphological annotations.
+#  
+#  Outputs summarized statistics about differences, and writes all differences into a 
+#  file. The output will be written into a directory named 'diff_' + collection's name.
 #
 
 import os, sys
@@ -44,13 +39,11 @@ from conf_utils import pick_random_doc_ids
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
-       "Evaluates how changing Vabamorf's binary lexicons alters EstNLTK's morphological "+
-       "annotations. \n"+
-       "Runs VabamorfTagger with given Vabamorf's binary lexicons on the given morphologically "+
-       "annotated PostgreSQL collection. "+
-       "Compares collection's morphological annotations against new annotations produced "+
-       "by VabamorfTagger. Finds all annotation differences. \n"+
-       "Outputs summarized statistics and detailed annotation differences.")
+       "Runs VabamorfTagger with given Vabamorf's binary lexicons on given morphologically "+
+       "annotated PostgreSQL collection, and finds differences in morphological annotations. "+
+       "Outputs summarized statistics about differences, and writes all differences into a "+
+       "file. By default, the output will be written into a directory named 'diff_' + "+
+       "collection's name. ")
     # 1) Specification of the evaluation settings #1
     parser.add_argument('vm_bin_dir', type=str, \
                         help="directory containing Vabamorf's binary lexicons (files 'et.dct' and 'et3.dct') "+\
@@ -58,7 +51,7 @@ if __name__ == '__main__':
     parser.add_argument('collection', type=str, \
                         help='name of the collection on which the evaluation will be performed.')
     parser.add_argument('morph_layer', type=str, \
-                        help='name of the morph analysis layer to be evaluated against. '+\
+                        help='name of the morph analysis layer to be compared against. '+\
                              'must be a layer of the input collection.')
     # 2) Database access & logging parameters
     parser.add_argument('--pgpass', dest='pgpass', action='store', \
