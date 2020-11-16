@@ -19,9 +19,6 @@ from estnltk import logger
 from estnltk.storage.postgres import PostgresStorage
 from estnltk.storage.postgres import KeysQuery
 
-from estnltk.resolve_layer_dag import DEFAULT_RESOLVER
-from estnltk.vabamorf.morf import Vabamorf as VabamorfInstance
-from estnltk.taggers import VabamorfTagger
 from estnltk.taggers import DiffTagger
 
 from morph_eval_utils import create_flat_v1_6_morph_analysis_layer
@@ -102,7 +99,7 @@ if __name__ == '__main__':
                              "statistics will be recorded / collected subcorpus wise. Otherwise, no subcorpus "+\
                              "distinction will be made in difference statistics and output. "+\
                              "(default: 'subcorpus')" )
-    parser.add_argument('--rand_pick', dest='rand_pick', action='store', type=int, \
+    parser.add_argument('-r', '--rand_pick', dest='rand_pick', action='store', type=int, \
                         help="integer value specifying the amount of documents to be randomly chosen for "+\
                              "difference evaluation. if specified, then the given amount of documents will be "+\
                              "processed (instead of processing the whole corpus). if the amount exceeds the "+\
