@@ -20,6 +20,7 @@ from estnltk.storage.postgres import PostgresStorage
 from estnltk.storage.postgres import KeysQuery
 
 from estnltk.taggers import DiffTagger
+from estnltk.layer_operations import extract_section
 
 from morph_eval_utils import create_flat_v1_6_morph_analysis_layer
 from morph_eval_utils import get_estnltk_morph_analysis_diff_annotations
@@ -32,7 +33,16 @@ from morph_eval_utils import MorphDiffSummarizer
 from conf_utils import create_vm_tagger_based_on_vm_instance
 from conf_utils import pick_random_doc_ids
 from conf_utils import create_vm_tagger
+from conf_utils import find_division_into_chunks
 
+# Whether large texts should be chunked into smaller texts before processing?
+chunk_large_texts = True
+
+# Minimum size for texts to be chunked
+chunked_text_min_size = 3750000
+
+# Chunk size 
+chunk_size = 400000
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
@@ -99,6 +109,13 @@ if __name__ == '__main__':
                              "statistics will be recorded / collected subcorpus wise. Otherwise, no subcorpus "+\
                              "distinction will be made in difference statistics and output. "+\
                              "(default: 'subcorpus')" )
+    parser.add_argument('--no_chunking', dest='no_chunking', default=False, action='store_true', \
+                        help=f"By default, documents that are too large (string size exceeding: {chunked_text_min_size}) "+
+                             "will be divided into chunks (so that the chunks follow sentence boundaries) and will be "+
+                             "processed chunk by chunk. However, setting this flag disables the chunking behaviour "+
+                             "and then all documents will be processed as whole. "+
+                             "(default: False)", \
+                        )
     parser.add_argument('-r', '--rand_pick', dest='rand_pick', action='store', type=int, \
                         help="integer value specifying the amount of documents to be randomly chosen for "+\
                              "difference evaluation. if specified, then the given amount of documents will be "+\
@@ -108,6 +125,10 @@ if __name__ == '__main__':
 
     logger.setLevel( (args.logging).upper() )
     log = logger
+    
+    chunk_large_texts = not args.no_chunking
+    if not chunk_large_texts:
+        log.info(' Chunking of large documents disabled.' )
     
     storage = PostgresStorage(pgpass_file=args.pgpass,
                               schema=args.schema,
@@ -208,37 +229,98 @@ if __name__ == '__main__':
                 if args.text_cat_key is not None:
                     if args.text_cat_key in text.meta.keys() and text.meta[args.text_cat_key] is not None:
                         text_cat = text.meta[ args.text_cat_key ]
-                # 1) Add new morph analysis annotations
-                vm_tagger.tag( text )
-                # 2) Create flat v1_6 morph analysis layers
-                flat_morph_1 = create_flat_v1_6_morph_analysis_layer( text, args.morph_layer, 
-                                                                            args.morph_layer+'_flat', add_layer=True )
-                flat_morph_2 = create_flat_v1_6_morph_analysis_layer( text, args.new_morph_layer,
-                                                                            args.new_morph_layer+'_flat', add_layer=True )
-                # 3) Find differences & alignments
-                morph_diff_tagger.tag( text )
-                ann_diffs  = get_estnltk_morph_analysis_diff_annotations( text, \
-                                                                          args.morph_layer+'_flat', \
+                # 0) Does the text need chunk by chunk processing?
+                text_sentences_str_len = sum( [len(s.enclosing_text) for s in text[vm_tagger.input_layers[1]] ] )
+                if chunk_large_texts and text_sentences_str_len >= chunked_text_min_size:
+                    log.info('Document {!r} (id: {!r}) is too large for processing it as a whole (approx. string size: {!r}).'.format( fname_stub, key, text_sentences_str_len ))
+                    log.info('It will be divided into chunks and processed chunk by chunk.')
+                    document_chunks = find_division_into_chunks( text[vm_tagger.input_layers[1]], chunk_size = chunk_size )
+                    first_chunk = True
+                    for (chunk_start, chunk_end) in document_chunks:
+                        log.debug('Processing chunk {!r} from {!r} ...'.format( (chunk_start, chunk_end), fname_stub) )
+                        text_chunk = extract_section(text, chunk_start, chunk_end, layers_to_keep=list(text.layers), trim_overlapping=True)
+                        # 1) Add new morph analysis annotations
+                        vm_tagger.tag( text_chunk )
+                        # 2) Create flat v1_6 morph analysis layers
+                        flat_morph_1 = create_flat_v1_6_morph_analysis_layer( text_chunk, args.morph_layer, 
+                                                                                          args.morph_layer+'_flat', add_layer=True )
+                        flat_morph_2 = create_flat_v1_6_morph_analysis_layer( text_chunk, args.new_morph_layer,
+                                                                                          args.new_morph_layer+'_flat', add_layer=True )
+                        # 3) Find differences & alignments
+                        morph_diff_tagger.tag( text_chunk )
+                        ann_diffs  = get_estnltk_morph_analysis_diff_annotations( text_chunk, \
+                                                                                  args.morph_layer+'_flat', \
+                                                                                  args.new_morph_layer+'_flat', \
+                                                                                  'morph_diff_layer' )
+                        flat_morph_layers = [args.morph_layer+'_flat', args.new_morph_layer+'_flat']
+                        focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
+                        alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
+                                                                                       text_chunk['morph_diff_layer'],
+                                                                                       focus_attributes=focus_attributes )
+                        # Record difference statistics
+                        morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text_chunk['morph_diff_layer'], 
+                                                                      text_cat, start_new_doc=first_chunk )
+                        # 5) Visualize & output words that have differences in annotations
+                        formatted, morph_diff_gap_counter = \
+                             format_morph_diffs_string( fname_stub, text_chunk, alignments, args.morph_layer+'_flat', \
                                                                           args.new_morph_layer+'_flat', \
-                                                                          'morph_diff_layer' )
-                flat_morph_layers = [args.morph_layer+'_flat', args.new_morph_layer+'_flat']
-                focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
-                alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
-                                                                               text['morph_diff_layer'],
-                                                                               focus_attributes=focus_attributes )
-                # Record difference statistics
-                morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text['morph_diff_layer'], text_cat )
-                # 5) Visualize & output words that have differences in annotations
-                formatted, morph_diff_gap_counter = \
-                     format_morph_diffs_string( fname_stub, text, alignments, args.morph_layer+'_flat', \
-                                                                  args.new_morph_layer+'_flat', \
-                                                                  gap_counter=morph_diff_gap_counter,
-                                                                  text_cat=text_cat, \
-                                                                  focus_attributes=focus_attributes )
-                if formatted is not None:
-                    fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
-                    write_formatted_diff_str_to_file( fpath, formatted )
-                
+                                                                          gap_counter=morph_diff_gap_counter,
+                                                                          text_cat=text_cat, \
+                                                                          focus_attributes=focus_attributes )
+                        if formatted is not None and len(formatted) > 0:
+                            fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
+                            write_formatted_diff_str_to_file( fpath, formatted )
+                        # Set pointers to None ( to help garbage collection )
+                        text_chunk = None
+                        flat_morph_1 = None
+                        flat_morph_2 = None
+                        ann_diffs  = None
+                        alignments = None
+                        formatted  = None
+                        # Next chunk == not first chunk anymore
+                        first_chunk = False
+                else:
+                    #
+                    # No chunking was required. Process the document as a whole
+                    #
+                    # 1) Add new morph analysis annotations
+                    vm_tagger.tag( text )
+                    # 2) Create flat v1_6 morph analysis layers
+                    flat_morph_1 = create_flat_v1_6_morph_analysis_layer( text, args.morph_layer, 
+                                                                                args.morph_layer+'_flat', add_layer=True )
+                    flat_morph_2 = create_flat_v1_6_morph_analysis_layer( text, args.new_morph_layer,
+                                                                                args.new_morph_layer+'_flat', add_layer=True )
+                    # 3) Find differences & alignments
+                    morph_diff_tagger.tag( text )
+                    ann_diffs  = get_estnltk_morph_analysis_diff_annotations( text, \
+                                                                              args.morph_layer+'_flat', \
+                                                                              args.new_morph_layer+'_flat', \
+                                                                              'morph_diff_layer' )
+                    flat_morph_layers = [args.morph_layer+'_flat', args.new_morph_layer+'_flat']
+                    focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
+                    alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
+                                                                                   text['morph_diff_layer'],
+                                                                                   focus_attributes=focus_attributes )
+                    # Record difference statistics
+                    morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text['morph_diff_layer'], text_cat )
+                    # 5) Visualize & output words that have differences in annotations
+                    formatted, morph_diff_gap_counter = \
+                         format_morph_diffs_string( fname_stub, text, alignments, args.morph_layer+'_flat', \
+                                                                      args.new_morph_layer+'_flat', \
+                                                                      gap_counter=morph_diff_gap_counter,
+                                                                      text_cat=text_cat, \
+                                                                      focus_attributes=focus_attributes )
+                    if formatted is not None:
+                        fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
+                        write_formatted_diff_str_to_file( fpath, formatted )
+                    # Set pointers to None ( to help garbage collection )
+                    text = None
+                    flat_morph_1 = None
+                    flat_morph_2 = None
+                    ann_diffs  = None
+                    alignments = None
+                    formatted  = None
+            
             summarizer_result_str = morph_diff_summarizer.get_diffs_summary_output( show_doc_count=True )
             log.info( os.linesep+os.linesep+'TOTAL DIFF STATISTICS:'+os.linesep+summarizer_result_str )
             time_diff = datetime.now() - startTime

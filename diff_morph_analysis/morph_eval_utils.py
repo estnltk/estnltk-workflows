@@ -389,7 +389,7 @@ class MorphDiffSummarizer:
         self.first_model    = first_model
         self.second_model   = second_model
     
-    def record_from_diff_layer( self, layer_name, layer, text_category ):
+    def record_from_diff_layer( self, layer_name, layer, text_category, start_new_doc=True ):
         assert isinstance(text_category, str)
         assert len(text_category) > 0
         if layer_name not in self.diffs_counter:
@@ -398,12 +398,14 @@ class MorphDiffSummarizer:
             self.diffs_counter[layer_name]['total'] = defaultdict(int)
         for key in layer.meta:
             self.diffs_counter[layer_name]['total'][key] += layer.meta[key]
-        self.diffs_counter[layer_name]['total']['_docs'] += 1
+        if start_new_doc:
+            self.diffs_counter[layer_name]['total']['_docs'] += 1
         if text_category not in self.diffs_counter[layer_name]:
             self.diffs_counter[layer_name][text_category] = defaultdict(int)
         for key in layer.meta:
             self.diffs_counter[layer_name][text_category][key] += layer.meta[key]
-        self.diffs_counter[layer_name][text_category]['_docs'] += 1
+        if start_new_doc:
+            self.diffs_counter[layer_name][text_category]['_docs'] += 1
 
     def get_diffs_summary_output( self, show_doc_count=True ):
         output = []

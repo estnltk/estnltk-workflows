@@ -122,6 +122,39 @@ def find_morph_analysis_dependency_layers( vabamorftagger, morph_layer, collecti
     return input_arg_to_collection_layer
 
 
+# =================================================
+# =================================================
+#    Dividing large file into chunks
+# =================================================
+# =================================================
+
+def find_division_into_chunks( layer, chunk_size=1000000 ):
+    ''' Finds a division of text into even sized chunks, 
+        so that the chunks follow start/end positions
+        of the given layer (a guiding layer).
+        A 'sentences' layer serves best as the guiding 
+        layer.
+    '''
+    division = []
+    i = 0
+    cur_size = 0
+    start_i  = 0
+    while ( i < len(layer) ):
+        cur_size += len(layer[i].enclosing_text)
+        if cur_size >= chunk_size:
+            start_pos = layer[start_i].start
+            end_pos   = layer[i].end
+            division.append( (start_pos, end_pos) )
+            start_i = i + 1
+            cur_size = 0
+        i += 1
+    if cur_size > 0:
+        assert i == len(layer)
+        start_pos = layer[start_i].start
+        end_pos   = layer[i-1].end
+        division.append( (start_pos, end_pos) )
+    return division
+
 
 # =================================================
 # =================================================
