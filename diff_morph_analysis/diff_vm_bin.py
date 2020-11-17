@@ -267,7 +267,7 @@ if __name__ == '__main__':
                                                                           gap_counter=morph_diff_gap_counter,
                                                                           text_cat=text_cat, \
                                                                           focus_attributes=focus_attributes )
-                        if formatted is not None and len(formatted) > 0:
+                        if formatted is not None  and  len(formatted) > 0:
                             fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
                             write_formatted_diff_str_to_file( fpath, formatted )
                         # Set pointers to None ( to help garbage collection )
@@ -310,7 +310,7 @@ if __name__ == '__main__':
                                                                       gap_counter=morph_diff_gap_counter,
                                                                       text_cat=text_cat, \
                                                                       focus_attributes=focus_attributes )
-                    if formatted is not None:
+                    if formatted is not None  and  len(formatted) > 0:
                         fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
                         write_formatted_diff_str_to_file( fpath, formatted )
                     # Set pointers to None ( to help garbage collection )
