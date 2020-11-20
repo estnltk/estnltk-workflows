@@ -9,6 +9,7 @@
 import os, sys, re
 import os.path
 import argparse
+import gc
 
 from collections import defaultdict
 
@@ -42,7 +43,7 @@ chunk_large_texts = True
 chunked_text_min_size = 3750000
 
 # Chunk size 
-chunk_size = 400000
+chunk_size = 300000
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
@@ -237,6 +238,7 @@ if __name__ == '__main__':
                     document_chunks = find_division_into_chunks( text[vm_tagger.input_layers[1]], chunk_size = chunk_size )
                     first_chunk = True
                     for (chunk_start, chunk_end) in document_chunks:
+                        gc.collect()  # Clean garbage before processing
                         log.debug('Processing chunk {!r} from {!r} ...'.format( (chunk_start, chunk_end), fname_stub) )
                         text_chunk = extract_section(text, chunk_start, chunk_end, layers_to_keep=list(text.layers), trim_overlapping=True)
                         # 1) Add new morph analysis annotations
