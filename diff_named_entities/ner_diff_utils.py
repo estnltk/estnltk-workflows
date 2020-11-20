@@ -445,8 +445,9 @@ class NerDiffFinder:
 
 class NerDiffSummarizer:
     '''Aggregates and summarizes named entity annotations difference statistics based on information from diff layers.
-       The class is based on  SegmentDiffSummarizer  from: 
+       The class is based on  SegmentDiffSummarizer & MorphDiffSummarizer  from: 
           https://github.com/estnltk/eval_experiments_lrec_2020/blob/master/scripts_and_data/segm_eval_utils.py
+          https://github.com/estnltk/eval_experiments_lrec_2020/blob/master/scripts_and_data/morph_eval_utils.py
     '''
 
     def __init__(self, first_model, second_model):
@@ -477,11 +478,15 @@ class NerDiffSummarizer:
         for layer in sorted( self.diffs_counter.keys() ):
             output.append( layer )
             output.append( '\n' )
+            output.append( '\n' )
             diff_categories = [k for k in sorted(self.diffs_counter[layer].keys()) if k != 'total']
             single_category = len(diff_categories) == 1
             assert 'total' in self.diffs_counter[layer]
             diff_categories.append('total')
             longest_cat_name = max( [len(k) for k in diff_categories] )
+            # First:  similarity in spans
+            output.append( ' span similarity:' )
+            output.append( '\n' )
             for category in diff_categories:
                 src = self.diffs_counter[layer][category]
                 if category == 'total' and single_category:
@@ -495,9 +500,37 @@ class NerDiffSummarizer:
                     output.append(' #docs: {} '.format(src['_docs']) )
                 # unchanged_spans + modified_spans + missing_spans = length_of_old_layer
                 # unchanged_spans + modified_spans + extra_spans = length_of_new_layer
+                first_layer_len  = src['unchanged_spans'] + src['modified_spans'] + src['missing_spans']
+                second_layer_len = src['unchanged_spans'] + src['modified_spans'] + src['extra_spans']
+                total_spans = first_layer_len + second_layer_len
+                # Ratio: https://docs.python.org/3.6/library/difflib.html#difflib.SequenceMatcher.ratio
+                ratio = (src['unchanged_spans']*2.0) / total_spans
+                output.append('|')
+                output.append(' sim ratio: {} / {}  ({:.4f}) '.format(src['unchanged_spans']*2, total_spans, ratio ))
+                missing_percent = (src['missing_spans']/total_spans)*100.0
+                output.append('|')
+                output.append(' only in {}: {} ({:.4f}%) '.format(self.first_model, src['missing_spans'], missing_percent ))
+                extra_percent = (src['extra_spans']/total_spans)*100.0
+                output.append('|')
+                output.append(' only in {}: {} ({:.4f}%) '.format(self.second_model, src['extra_spans'], extra_percent ))
+                output.append('\n')
+            output.append('\n')
+            # Second: similarity in annotations (modified/overlapping spans + annotation sim ratio)
+            output.append( ' annotation similarity:' )
+            output.append( '\n' )
+            for category in diff_categories:
+                src = self.diffs_counter[layer][category]
+                if category == 'total' and single_category:
+                    # No need to display TOTAL, if there was only one category
+                    continue
+                if category == 'total':
+                    category = 'TOTAL'
+                output.append( (' {:'+str(longest_cat_name+1)+'}').format(category) )
+                if show_doc_count:
+                    output.append('|')
+                    output.append(' #docs: {} '.format(src['_docs']) )
                 # unchanged_annotations + missing_annotations = number_of_annotations_in_old_layer
                 # unchanged_annotations + extra_annotations   = number_of_annotations_in_new_layer
-                
                 first_layer_len  = src['unchanged_annotations'] + src['missing_annotations']
                 second_layer_len = src['unchanged_annotations'] + src['extra_annotations']
                 total_spans = first_layer_len + second_layer_len
@@ -508,7 +541,7 @@ class NerDiffSummarizer:
                 output.append('|')
                 # Ratio: https://docs.python.org/3.6/library/difflib.html#difflib.SequenceMatcher.ratio
                 ratio = (src['unchanged_annotations']*2.0) / total_spans
-                output.append(' annotations ratio: {} / {} ({:.4f}) '.format(src['unchanged_annotations']*2, total_spans, ratio ))
+                output.append(' annotations sim ratio: {} / {} ({:.4f}) '.format(src['unchanged_annotations']*2, total_spans, ratio ))
                 missing_percent = (src['missing_annotations']/total_spans)*100.0
                 output.append('|')
                 output.append(' only in {}: {} ({:.4f}%) '.format(self.first_model, src['missing_annotations'], missing_percent ))
