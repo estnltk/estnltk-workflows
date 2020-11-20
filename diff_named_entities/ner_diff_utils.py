@@ -379,15 +379,15 @@ class NerDiffFinder:
     
     def __init__( self, old_layer: str, 
                         new_layer: str,
-                        old_layer_label: str = 'nertag',
-                        new_layer_label: str = 'nertag',
-                        output_format:   str = 'vertical',
+                        old_layer_attr: str = 'nertag',
+                        new_layer_attr: str = 'nertag',
+                        output_format:  str = 'vertical',
                         flat_layer_suffix: str = '_flat'):
         self._flat_layer_suffix = '_flat'
         self.old_layer   = old_layer
         self.new_layer   = new_layer
-        self.old_layer_label = old_layer_label
-        self.new_layer_label = new_layer_label
+        self.old_layer_attr = old_layer_attr
+        self.new_layer_attr = new_layer_attr
         self.common_label    = '__label'
         self.ner_diff_tagger = DiffTagger( layer_a = old_layer+self._flat_layer_suffix,
                                            layer_b = new_layer+self._flat_layer_suffix,
@@ -402,10 +402,10 @@ class NerDiffFinder:
         # Check input layers
         assert self.old_layer in text.layers, f'(!) Input text is missing "{self.old_layer}" layer.'
         assert self.new_layer in text.layers, f'(!) Input text is missing "{self.new_layer}" layer.'
-        assert self.old_layer_label in text[self.old_layer].attributes, \
-               f'(!) Attribute "{self.old_layer_label}" is missing from layer "{self.old_layer}".'
-        assert self.new_layer_label in text[self.new_layer].attributes, \
-               f'(!) Attribute "{self.new_layer_label}" is missing from layer "{self.new_layer}".'
+        assert self.old_layer_attr in text[self.old_layer].attributes, \
+               f'(!) Attribute "{self.old_layer_attr}" is missing from layer "{self.old_layer}".'
+        assert self.new_layer_attr in text[self.new_layer].attributes, \
+               f'(!) Attribute "{self.new_layer_attr}" is missing from layer "{self.new_layer}".'
         assert self.common_label not in text[self.old_layer].attributes, \
                f'(!) Invalid attribute name "{self.common_label}" used in layer "{self.old_layer}".'
         assert self.common_label not in text[self.new_layer].attributes, \
@@ -415,10 +415,10 @@ class NerDiffFinder:
         flat_b_name = self.new_layer+self._flat_layer_suffix
         old_layer_flat = flatten( text[self.old_layer], flat_a_name, 
                                   output_attributes=[self.common_label], 
-                                  attribute_mapping=[(self.old_layer_label, self.common_label)] )
+                                  attribute_mapping=[(self.old_layer_attr, self.common_label)] )
         new_layer_flat = flatten( text[self.new_layer], flat_b_name, 
                                   output_attributes=[self.common_label],  
-                                  attribute_mapping=[(self.new_layer_label, self.common_label)] )
+                                  attribute_mapping=[(self.new_layer_attr, self.common_label)] )
         # Find raw differences
         diff_layer = self.ner_diff_tagger.make_layer( text, { flat_a_name:old_layer_flat,
                                                               flat_b_name:new_layer_flat } )
@@ -515,7 +515,7 @@ class NerDiffSummarizer:
                 output.append(' only in {}: {} ({:.4f}%) '.format(self.second_model, src['extra_spans'], extra_percent ))
                 output.append('\n')
             output.append('\n')
-            # Second: similarity in annotations (modified/overlapping spans + annotation sim ratio)
+            # Second: similarity in annotations (modified overlapping spans + annotation sim ratio)
             output.append( ' annotation similarity:' )
             output.append( '\n' )
             for category in diff_categories:

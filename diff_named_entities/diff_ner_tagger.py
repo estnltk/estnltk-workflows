@@ -139,8 +139,8 @@ if __name__ == '__main__':
 
 
             ner_diff_finder = NerDiffFinder( args.ner_layer, args.new_ner_layer,    
-                                             old_layer_label=args.old_ne_attr, 
-                                             new_layer_label=args.new_ne_attr  )
+                                             old_layer_attr=args.old_ne_attr, 
+                                             new_layer_attr=args.new_ne_attr  )
             ner_diff_summarizer = NerDiffSummarizer( args.ner_layer, args.new_ner_layer )
             
             startTime = datetime.now()
