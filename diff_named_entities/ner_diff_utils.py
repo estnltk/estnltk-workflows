@@ -383,6 +383,28 @@ class NerDiffFinder:
                         new_layer_attr: str = 'nertag',
                         output_format:  str = 'vertical',
                         flat_layer_suffix: str = '_flat'):
+        """Initiates NerDiffFinder. A specification of comparable layers
+           must be provided.
+        
+           :param old_layer: str
+               Name of the old named entities layer.
+           :param new_layer: str
+               Name of the new named entities layer.
+           :param old_layer_attr: str
+               Name of the attribute containing NE type label in the old layer. 
+               Defaults to 'nertag';
+           :param new_layer_attr: str
+               Name of the attribute containing NE type label in the new layer. 
+               Defaults to 'nertag';
+           :param output_format: str
+               Whether the differences are aligned in the output string vertically 
+               or horizontally.
+               Possible values: 'vertical' (default), 'horizontal'.
+           :param flat_layer_suffix: str
+               Flat layers will be created from comparable NE layers before the 
+               comparison, and this is the suffix that will be added to both
+               flat layers. Defaults to '_flat';
+        """
         self._flat_layer_suffix = '_flat'
         self.old_layer   = old_layer
         self.new_layer   = new_layer
@@ -397,8 +419,38 @@ class NerDiffFinder:
         self.output_format = output_format
         self.gap_counter = 0
         self.doc_counter = 0
-    
+
+
     def find_difference( self, text, fname, text_cat='', start_new_doc=True ):
+        """Finds differences between old layer and new layer in given text, 
+           and returns as a tuple (diff_layer, formatted_diffs_str, total_diff_gaps).
+        
+           :param text: `Text` object
+               `Text` object in which differences will be found. Must contain
+               `old_layer` and `new_layer`.
+           :param fname: str
+               Name of the file or document corresponding to the `Text` object.
+               The name appears in formatted output (formatted_diffs_str) as 
+               a part of the identifier of each difference.
+           :param text_cat: str
+               Name of the genre or subcorpus where the `Text` object belongs to.
+               The name appears in formatted output (formatted_diffs_str) as 
+               a part of the identifier of each difference. Defaults to '';
+           :param start_new_doc: 
+               Whether this `Text` object starts a new document or continues
+               an existing document.
+               If `True` (default), then it starts a new document and document 
+               count will be increased.
+           
+           :return tuple
+               A tuple `(diff_layer, formatted_diffs_str, total_diff_gaps)`:
+               * `diff_layer` -- `Layer` of differences created by DiffTagger.
+                                 contains differences between old layer and new 
+                                 layer.
+               * `formatted_diffs_str` -- output string showing grouped differences 
+                                          along with their contexts.
+               * `total_diff_gaps` -- integer: total number of grouped differences.
+        """
         # Check input layers
         assert self.old_layer in text.layers, f'(!) Input text is missing "{self.old_layer}" layer.'
         assert self.new_layer in text.layers, f'(!) Input text is missing "{self.new_layer}" layer.'
@@ -451,11 +503,33 @@ class NerDiffSummarizer:
     '''
 
     def __init__(self, first_model, second_model):
+        """Initiates NerDiffSummarizer.
+        
+           :param first_model: str
+               Name of the first layer that is compared (the old layer).
+           :param second_model: str
+               Name of the second layer that is compared (the new layer).
+        """
         self.diffs_counter  = {}
         self.first_model    = first_model
         self.second_model   = second_model
     
     def record_from_diff_layer( self, layer_name, diff_layer, text_category, start_new_doc=True ):
+        """Records differences in given document, based on the statistics in metadata of diff_layer.
+           
+           :param layer_name: str
+               Name of the layer which two versions were compared in diff_layer.
+           :param diff_layer: `Layer` object
+               `Layer` object containing differences between the old layer and 
+               the new layer. Must be a layer created by DiffTagger.
+           :param text_category: str
+               Name of the genre or subcorpus where the given document belongs to.
+           :param start_new_doc: bool
+               Whether the given document is a new document or a continuation of 
+               the previous document.
+               If `True` (default), then it starts a new document and document 
+               count will be increased. Otherwise, document count is not updated.
+        """
         assert isinstance(text_category, str)
         assert len(text_category) > 0
         if layer_name not in self.diffs_counter:
@@ -474,6 +548,16 @@ class NerDiffSummarizer:
             self.diffs_counter[layer_name][text_category]['_docs'] += 1
 
     def get_diffs_summary_output( self, show_doc_count=True ):
+        """Summarizes aquired difference statistics over subcorpora and over the 
+           whole corpus. Returns statistics formatted as a table (string).
+           
+           :param show_doc_count: bool
+               Whether statistics should include the number of documents in each 
+               corpus. Defaults to True.
+               
+           :return str
+               statistics formatted as a table (string).
+        """
         output = []
         for layer in sorted( self.diffs_counter.keys() ):
             output.append( layer )
