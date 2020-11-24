@@ -214,8 +214,12 @@ if __name__ == '__main__':
                 data_iterator = collection.select( KeysQuery(keys=chosen_doc_ids), progressbar='ascii', layers=eval_layers )
             else:
                 data_iterator = collection.select( progressbar='ascii', layers=eval_layers )
+            last_was_huge_file = False
             for key, text in data_iterator:
-                # 0) Fetch document and subcorpus' identifiers
+                # *) Garbage collection if previously a huge file was processed
+                if last_was_huge_file:
+                    gc.collect()  # Clean garbage before processing
+                # *) Fetch document and subcorpus' identifiers
                 fname_stub = 'doc' + str(key)
                 if args.file_name_key is not None:
                     if args.file_name_key in text.meta.keys() and text.meta[args.file_name_key] is not None:
@@ -224,7 +228,7 @@ if __name__ == '__main__':
                 if args.text_cat_key is not None:
                     if args.text_cat_key in text.meta.keys() and text.meta[args.text_cat_key] is not None:
                         text_cat = text.meta[ args.text_cat_key ]
-                # 0) Does the text need chunk by chunk processing?
+                # *) Does the text need chunk by chunk processing?
                 text_sentences_str_len = sum( [len(s.enclosing_text) for s in text[vm_tagger.input_layers[1]] ] )
                 if chunk_large_texts and text_sentences_str_len >= chunked_text_min_size:
                     log.info('Document {!r} (id: {!r}) is too large for processing it as a whole (approx. string size: {!r}).'.format( fname_stub, key, text_sentences_str_len ))
@@ -253,6 +257,8 @@ if __name__ == '__main__':
                         morph_diff_layer    = None
                         # Next chunk == not first chunk anymore
                         first_chunk = False
+                    # Remember that last was a huge file
+                    last_was_huge_file = True
                 else:
                     #
                     # No chunking was required. Process the document as a whole
@@ -272,6 +278,7 @@ if __name__ == '__main__':
                     text                = None
                     morph_diff_layer    = None
                     formatted_diffs_str = None
+                    last_was_huge_file  = False
             
             summarizer_result_str = morph_diff_summarizer.get_diffs_summary_output( show_doc_count=True )
             log.info( os.linesep+os.linesep+'TOTAL DIFF STATISTICS:'+os.linesep+summarizer_result_str )
