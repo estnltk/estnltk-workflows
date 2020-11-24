@@ -23,13 +23,8 @@ from estnltk.storage.postgres import KeysQuery
 from estnltk.taggers import DiffTagger
 from estnltk.layer_operations import extract_section
 
-from morph_eval_utils import create_flat_v1_6_morph_analysis_layer
-from morph_eval_utils import get_estnltk_morph_analysis_diff_annotations
-from morph_eval_utils import get_estnltk_morph_analysis_annotation_alignments
-from morph_eval_utils import get_concise_morph_diff_alignment_str
-from morph_eval_utils import format_morph_diffs_string
 from morph_eval_utils import write_formatted_diff_str_to_file
-from morph_eval_utils import MorphDiffSummarizer
+from morph_eval_utils import MorphDiffSummarizer, MorphDiffFinder
 
 from conf_utils import create_vm_tagger_based_on_vm_instance
 from conf_utils import pick_random_doc_ids
@@ -195,13 +190,12 @@ if __name__ == '__main__':
                                               incl_prefix=args.in_prefix, \
                                               incl_suffix=args.in_suffix )
             
-            morph_diff_tagger = DiffTagger(layer_a = args.morph_layer+'_flat',
-                                           layer_b = args.new_morph_layer+'_flat',
-                                           output_layer='morph_diff_layer',
-                                           output_attributes=('span_status', 'root', 'lemma', 'root_tokens', 'ending', 'clitic', 'partofspeech', 'form'),
-                                           span_status_attribute='span_status')
+            morph_diff_finder = MorphDiffFinder( args.morph_layer, args.new_morph_layer, 
+                                                 diff_attribs  = ['root', 'lemma', 'root_tokens', 'ending', 'clitic', 
+                                                                  'partofspeech', 'form'],
+                                                 focus_attribs = ['root', 'ending', 'clitic', 'partofspeech', 'form'] )
             morph_diff_summarizer = MorphDiffSummarizer( args.morph_layer, args.new_morph_layer )
-            morph_diff_gap_counter = 0
+            
             startTime = datetime.now()
             
             # Create output directory name
@@ -243,42 +237,20 @@ if __name__ == '__main__':
                         text_chunk = extract_section(text, chunk_start, chunk_end, layers_to_keep=list(text.layers), trim_overlapping=True)
                         # 1) Add new morph analysis annotations
                         vm_tagger.tag( text_chunk )
-                        # 2) Create flat v1_6 morph analysis layers
-                        flat_morph_1 = create_flat_v1_6_morph_analysis_layer( text_chunk, args.morph_layer, 
-                                                                                          args.morph_layer+'_flat', add_layer=True )
-                        flat_morph_2 = create_flat_v1_6_morph_analysis_layer( text_chunk, args.new_morph_layer,
-                                                                                          args.new_morph_layer+'_flat', add_layer=True )
-                        # 3) Find differences & alignments
-                        morph_diff_tagger.tag( text_chunk )
-                        ann_diffs  = get_estnltk_morph_analysis_diff_annotations( text_chunk, \
-                                                                                  args.morph_layer+'_flat', \
-                                                                                  args.new_morph_layer+'_flat', \
-                                                                                  'morph_diff_layer' )
-                        flat_morph_layers = [args.morph_layer+'_flat', args.new_morph_layer+'_flat']
-                        focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
-                        alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
-                                                                                       text_chunk['morph_diff_layer'],
-                                                                                       focus_attributes=focus_attributes )
-                        # Record difference statistics
-                        morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text_chunk['morph_diff_layer'], 
+                        # 2) Find the layer of differences, group differences & format nicely 
+                        morph_diff_layer, formatted_diffs_str, total_diff_gaps = \
+                             morph_diff_finder.find_difference( text_chunk, fname_stub, text_cat=text_cat, start_new_doc=first_chunk )
+                        # 3) Record difference statistics
+                        morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', morph_diff_layer, 
                                                                       text_cat, start_new_doc=first_chunk )
-                        # 5) Visualize & output words that have differences in annotations
-                        formatted, morph_diff_gap_counter = \
-                             format_morph_diffs_string( fname_stub, text_chunk, alignments, args.morph_layer+'_flat', \
-                                                                          args.new_morph_layer+'_flat', \
-                                                                          gap_counter=morph_diff_gap_counter,
-                                                                          text_cat=text_cat, \
-                                                                          focus_attributes=focus_attributes )
-                        if formatted is not None  and  len(formatted) > 0:
+                        # 4) Visualize & output words that have differences in annotations
+                        if formatted_diffs_str is not None  and  len(formatted_diffs_str) > 0:
                             fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
-                            write_formatted_diff_str_to_file( fpath, formatted )
+                            write_formatted_diff_str_to_file( fpath, formatted_diffs_str )
                         # Set pointers to None ( to help garbage collection )
-                        text_chunk = None
-                        flat_morph_1 = None
-                        flat_morph_2 = None
-                        ann_diffs  = None
-                        alignments = None
-                        formatted  = None
+                        text_chunk          = None
+                        formatted_diffs_str = None
+                        morph_diff_layer    = None
                         # Next chunk == not first chunk anymore
                         first_chunk = False
                 else:
@@ -287,41 +259,19 @@ if __name__ == '__main__':
                     #
                     # 1) Add new morph analysis annotations
                     vm_tagger.tag( text )
-                    # 2) Create flat v1_6 morph analysis layers
-                    flat_morph_1 = create_flat_v1_6_morph_analysis_layer( text, args.morph_layer, 
-                                                                                args.morph_layer+'_flat', add_layer=True )
-                    flat_morph_2 = create_flat_v1_6_morph_analysis_layer( text, args.new_morph_layer,
-                                                                                args.new_morph_layer+'_flat', add_layer=True )
-                    # 3) Find differences & alignments
-                    morph_diff_tagger.tag( text )
-                    ann_diffs  = get_estnltk_morph_analysis_diff_annotations( text, \
-                                                                              args.morph_layer+'_flat', \
-                                                                              args.new_morph_layer+'_flat', \
-                                                                              'morph_diff_layer' )
-                    flat_morph_layers = [args.morph_layer+'_flat', args.new_morph_layer+'_flat']
-                    focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
-                    alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
-                                                                                   text['morph_diff_layer'],
-                                                                                   focus_attributes=focus_attributes )
-                    # Record difference statistics
-                    morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', text['morph_diff_layer'], text_cat )
-                    # 5) Visualize & output words that have differences in annotations
-                    formatted, morph_diff_gap_counter = \
-                         format_morph_diffs_string( fname_stub, text, alignments, args.morph_layer+'_flat', \
-                                                                      args.new_morph_layer+'_flat', \
-                                                                      gap_counter=morph_diff_gap_counter,
-                                                                      text_cat=text_cat, \
-                                                                      focus_attributes=focus_attributes )
-                    if formatted is not None  and  len(formatted) > 0:
+                    # 2) Find the layer of differences, group differences & format nicely 
+                    morph_diff_layer, formatted_diffs_str, total_diff_gaps = \
+                         morph_diff_finder.find_difference( text, fname_stub, text_cat=text_cat, start_new_doc=True )
+                    # 3) Record difference statistics
+                    morph_diff_summarizer.record_from_diff_layer( 'morph_analysis', morph_diff_layer, text_cat )
+                    # 4) Visualize & output words that have differences in annotations
+                    if formatted_diffs_str is not None  and  len(formatted_diffs_str) > 0:
                         fpath = os.path.join(output_dir, f'_{output_file_prefix}__ann_diffs_{output_file_suffix}.txt')
-                        write_formatted_diff_str_to_file( fpath, formatted )
+                        write_formatted_diff_str_to_file( fpath, formatted_diffs_str )
                     # Set pointers to None ( to help garbage collection )
-                    text = None
-                    flat_morph_1 = None
-                    flat_morph_2 = None
-                    ann_diffs  = None
-                    alignments = None
-                    formatted  = None
+                    text                = None
+                    morph_diff_layer    = None
+                    formatted_diffs_str = None
             
             summarizer_result_str = morph_diff_summarizer.get_diffs_summary_output( show_doc_count=True )
             log.info( os.linesep+os.linesep+'TOTAL DIFF STATISTICS:'+os.linesep+summarizer_result_str )

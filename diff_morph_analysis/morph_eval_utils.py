@@ -5,7 +5,7 @@
 # =========================================================
 # =========================================================
 #
-#  Based on: 
+#  Partly based on: 
 #   https://github.com/estnltk/eval_experiments_lrec_2020
 #
 
@@ -47,22 +47,24 @@ def get_estnltk_morph_analysis_diff_annotations( text_obj, layer_a, layer_b, dif
     ''' Collects differing sets of annotations from EstNLTK's morph_analysis diff_layer. '''
     STATUS_ATTR = '__status'
     assert isinstance(text_obj, Text)
-    assert layer_a in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(layer_a, text_obj.layers)
-    assert layer_b in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(layer_b, text_obj.layers)
-    assert diff_layer in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(diff_layer, text_obj.layers)
-    layer_a_spans = text_obj[layer_a]
-    layer_b_spans = text_obj[layer_b]
-    common_attribs = set(text_obj[layer_a].attributes).intersection( set(text_obj[layer_b].attributes) )
-    assert len(common_attribs) > 0, '(!) Layers {!r} and {!r} have no common attributes!'.format(layer_a, layer_b)
+    assert isinstance(layer_a, Layer)
+    assert isinstance(layer_b, Layer)
+    assert isinstance(diff_layer, Layer)
+    layer_a_name = layer_a.name
+    layer_b_name = layer_b.name
+    layer_a_spans = layer_a
+    layer_b_spans = layer_b
+    common_attribs = set(layer_a.attributes).intersection( set(layer_b.attributes) )
+    assert len(common_attribs) > 0, '(!) Layers {!r} and {!r} have no common attributes!'.format(layer_a_name, layer_b_name)
     assert STATUS_ATTR not in common_attribs, "(!) Unexpected attribute {!r} in {!r}.".format(STATUS_ATTR, common_attribs)
-    assert layer_a not in ['start', 'end']
-    assert layer_b not in ['start', 'end']
+    assert layer_a_name not in ['start', 'end']
+    assert layer_b_name not in ['start', 'end']
     collected_diffs = []
     missing_annotations = 0
     extra_annotations   = 0
     a_id = 0
     b_id = 0
-    for diff_span in iterate_modified( text_obj[diff_layer], 'span_status' ):
+    for diff_span in iterate_modified( diff_layer, 'span_status' ):
         ds_start = diff_span.start
         ds_end =   diff_span.end
         # Find corresponding span in both layer
@@ -81,9 +83,9 @@ def get_estnltk_morph_analysis_diff_annotations( text_obj, layer_a, layer_b, dif
                 break
             b_id += 1
         if a_span == None:
-            raise Exception('(!) {!r} not found from layer {!r}'.format(diff_span, layer_a))
+            raise Exception('(!) {!r} not found from layer {!r}'.format(diff_span, layer_a_name))
         if b_span == None:
-            raise Exception('(!) {!r} not found from layer {!r}'.format(diff_span, layer_b))
+            raise Exception('(!) {!r} not found from layer {!r}'.format(diff_span, layer_b_name))
         a_annotations = []
         for a_anno in a_span.annotations:
             a_dict = a_anno.__dict__.copy()
@@ -111,7 +113,11 @@ def get_estnltk_morph_analysis_diff_annotations( text_obj, layer_a, layer_b, dif
             if b_anno not in a_annotations:
                 extra_annotations += 1
                 b_anno[STATUS_ATTR] = 'EXTRA'
-        collected_diffs.append( {'text':diff_span.text, layer_a: a_annotations, layer_b: b_annotations, 'start':diff_span.start, 'end':diff_span.end} )
+        collected_diffs.append( {'text':diff_span.text, 
+                                 layer_a_name: a_annotations, 
+                                 layer_b_name: b_annotations, 
+                                 'start':diff_span.start, 
+                                 'end':diff_span.end} )
     # Sanity check: missing vs extra annotations:
     # Note: text_obj[diff_layer].meta contains more *_annotations items, because it also 
     #       counts annotations in missing spans and extra spans; Unfortunately, merely
@@ -122,14 +128,14 @@ def get_estnltk_morph_analysis_diff_annotations( text_obj, layer_a, layer_b, dif
     #       than one annotation. So, we have to re-count extra and missing annotations ...
     normalized_extra_annotations   = 0
     normalized_missing_annotations = 0
-    for span in text_obj[diff_layer]:
-        for status in span.span_status:
+    for diff_span in diff_layer:
+        for status in diff_span.span_status:
             if status == 'missing':
                 normalized_missing_annotations += 1
             elif status == 'extra':
                 normalized_extra_annotations += 1
-    assert missing_annotations == text_obj[diff_layer].meta['missing_annotations'] - normalized_missing_annotations
-    assert extra_annotations == text_obj[diff_layer].meta['extra_annotations'] - normalized_extra_annotations
+    assert missing_annotations == diff_layer.meta['missing_annotations'] - normalized_missing_annotations
+    assert extra_annotations == diff_layer.meta['extra_annotations'] - normalized_extra_annotations
     return collected_diffs
 
 
@@ -345,8 +351,8 @@ def _text_snippet( text_obj, start, end ):
 def format_morph_diffs_string( fname_stub, text_obj, diff_word_alignments, layer_a, layer_b, gap_counter=0, text_cat='',
                                                                            focus_attributes=['root','partofspeech','form'] ):
     '''Formats aligned differences as human-readable text snippets.'''
-    assert layer_a in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(layer_a, text_obj.layers)
-    assert layer_b in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(layer_b, text_obj.layers)
+    #assert layer_a in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(layer_a, text_obj.layers)
+    #assert layer_b in text_obj.layers, '(!) Layer {!r} missing from: {!r}'.format(layer_b, text_obj.layers)
     N = 60
     output_lines = []
     for word_alignments in diff_word_alignments:
@@ -381,15 +387,158 @@ def write_formatted_diff_str_to_file( out_fname, output_lines ):
             f.write('\n')
 
 
+class MorphDiffFinder:
+    '''Finds all differences between two (Vabamorf's) morphological analysis 
+       layers, and groups differences in modified spans in a way that both 
+       matching and mismatching annotations are shown.
+       Note: output grouped differences only cover modified spans; annotations 
+       on non-overlapping spans (missing and extra spans) will be left out.
+    '''
+    
+    def __init__( self, old_layer: str, 
+                        new_layer: str,
+                        diff_attribs  = ['root', 'lemma', 'root_tokens', 'ending', 'clitic', 'partofspeech', 'form'],
+                        focus_attribs = ['root', 'ending', 'clitic', 'partofspeech', 'form'],
+                        output_format:  str = 'vertical',
+                        flat_layer_suffix: str = '_flat'):
+        """Initializes MorphDiffFinder. A specification of comparable layers
+           must be provided.
+        
+           :param old_layer: str
+               Name of the old morph_analysis layer.
+           :param new_layer: str
+               Name of the new morph_analysis layer.
+           :param diff_attribs:   list
+               List containing morph_analysis attributes which will be used
+               for finding difference with DiffTagger. 
+               Defaults to ['root', 'lemma', 'root_tokens', 'ending', 'clitic', 
+               'partofspeech', 'form'];
+           :param focus_attribs:  list
+               List containing morph_analysis attributes which values will be
+               displayed in the output. 
+               Defaults to ['root', 'ending', 'clitic', 'partofspeech', 'form'];
+           :param output_format: str
+               Whether the differences are aligned in the output string vertically 
+               or horizontally.
+               Possible values: 'vertical' (default), 'horizontal'.
+           :param flat_layer_suffix: str
+               Flat layers will be created from comparable morph_analysis 
+               layers before the comparison, and this is the suffix that will 
+               be added to both flat layers. Defaults to '_flat';
+        """
+        self._flat_layer_suffix = '_flat'
+        self.old_layer   = old_layer
+        self.new_layer   = new_layer
+        self.diff_attribs  = diff_attribs
+        self.focus_attribs = focus_attribs
+        self.morph_diff_tagger = DiffTagger( layer_a = old_layer+self._flat_layer_suffix,
+                                             layer_b = new_layer+self._flat_layer_suffix,
+                                             output_layer='morph_diff_layer',
+                                             output_attributes=('span_status', ) + tuple(diff_attribs),
+                                             span_status_attribute='span_status' )
+        self.output_format = output_format
+        self.gap_counter = 0
+        self.doc_counter = 0
+
+
+    def find_difference( self, text, fname, text_cat='', start_new_doc=True ):
+        """Finds differences between old layer and new layer in given text, 
+           and returns as a tuple (diff_layer, formatted_diffs_str, total_diff_gaps).
+        
+           :param text: `Text` object
+               `Text` object in which differences will be found. Must contain
+               `old_layer` and `new_layer`.
+           :param fname: str
+               Name of the file or document corresponding to the `Text` object.
+               The name appears in formatted output (formatted_diffs_str) as 
+               a part of the identifier of each difference.
+           :param text_cat: str
+               Name of the genre or subcorpus where the `Text` object belongs to.
+               The name appears in formatted output (formatted_diffs_str) as 
+               a part of the identifier of each difference. Defaults to '';
+           :param start_new_doc: 
+               Whether this `Text` object starts a new document or continues
+               an existing document.
+               If `True` (default), then it starts a new document and document 
+               count will be increased.
+           
+           :return tuple
+               A tuple `(diff_layer, formatted_diffs_str, total_diff_gaps)`:
+               * `diff_layer` -- `Layer` of differences created by DiffTagger.
+                                 contains differences between old layer and new 
+                                 layer.
+               * `formatted_diffs_str` -- output string showing grouped differences 
+                                          along with their contexts.
+                                          Note: these differences only cover modified
+                                          spans, annotations on non-overlapping spans
+                                          (missing and extra spans) will be left out.
+               * `total_diff_gaps` -- integer: total number of grouped differences.
+        """
+        # Check input layers
+        assert self.old_layer in text.layers, f'(!) Input text is missing "{self.old_layer}" layer.'
+        assert self.new_layer in text.layers, f'(!) Input text is missing "{self.new_layer}" layer.'
+        # 1) Create flat v1_6 morph analysis layers
+        flat_morph_1 = create_flat_v1_6_morph_analysis_layer( text, self.old_layer, 
+                                                                    self.old_layer + self._flat_layer_suffix, 
+                                                                    add_layer=False )
+        flat_morph_2 = create_flat_v1_6_morph_analysis_layer( text, self.new_layer,
+                                                                    self.new_layer + self._flat_layer_suffix, 
+                                                                    add_layer=False )
+        # 2) Find differences & alignments
+        diff_layer = self.morph_diff_tagger.make_layer( text, { self.old_layer+self._flat_layer_suffix : flat_morph_1,
+                                                                self.new_layer+self._flat_layer_suffix : flat_morph_2 } )
+        ann_diffs = get_estnltk_morph_analysis_diff_annotations( text, flat_morph_1, flat_morph_2, diff_layer )
+        flat_morph_layers = [self.old_layer + self._flat_layer_suffix, self.new_layer + self._flat_layer_suffix]
+        focus_attributes  = ['root', 'ending', 'clitic', 'partofspeech', 'form']
+        alignments = get_estnltk_morph_analysis_annotation_alignments( ann_diffs, flat_morph_layers ,\
+                                                                       diff_layer,
+                                                                       focus_attributes=self.focus_attribs )
+        # 3) Group differences and add context (for better readability)
+        formatted_diffs_str, new_morph_diff_gap_counter = \
+             format_morph_diffs_string( fname, text, alignments, self.old_layer+self._flat_layer_suffix, \
+                                                                 self.new_layer+self._flat_layer_suffix, \
+                                                                 gap_counter=self.gap_counter,
+                                                                 text_cat=text_cat, \
+                                                                 focus_attributes=self.focus_attribs )
+        total_diff_gaps = new_morph_diff_gap_counter - self.gap_counter
+        self.gap_counter = new_morph_diff_gap_counter
+        if start_new_doc:
+            self.doc_counter += 1
+        return diff_layer, formatted_diffs_str, total_diff_gaps
+
+
+
 class MorphDiffSummarizer:
     '''Aggregates and summarizes morph_analysis annotations difference statistics based on information from diff layers.'''
 
     def __init__(self, first_model, second_model):
+        """Initializes MorphDiffSummarizer.
+        
+           :param first_model: str
+               Name of the first layer that is compared (the old layer).
+           :param second_model: str
+               Name of the second layer that is compared (the new layer).
+        """
         self.diffs_counter = {}
         self.first_model    = first_model
         self.second_model   = second_model
     
     def record_from_diff_layer( self, layer_name, layer, text_category, start_new_doc=True ):
+        """Records differences in given document, based on the statistics in metadata of diff_layer.
+           
+           :param layer_name: str
+               Name of the layer which two versions were compared in diff_layer.
+           :param diff_layer: `Layer` object
+               `Layer` object containing differences between the old layer and 
+               the new layer. Must be a layer created by DiffTagger.
+           :param text_category: str
+               Name of the genre or subcorpus where the given document belongs to.
+           :param start_new_doc: bool
+               Whether the given document is a new document or a continuation of 
+               the previous document.
+               If `True` (default), then it starts a new document and document 
+               count will be increased. Otherwise, document count is not updated.
+        """
         assert isinstance(text_category, str)
         assert len(text_category) > 0
         if layer_name not in self.diffs_counter:
@@ -408,6 +557,16 @@ class MorphDiffSummarizer:
             self.diffs_counter[layer_name][text_category]['_docs'] += 1
 
     def get_diffs_summary_output( self, show_doc_count=True ):
+        """Summarizes aquired difference statistics over subcorpora and over the 
+           whole corpus. Returns statistics formatted as a table (string).
+           
+           :param show_doc_count: bool
+               Whether statistics should include the number of documents in each 
+               corpus. Defaults to True.
+               
+           :return str
+               statistics formatted as a table (string).
+        """
         output = []
         for layer in sorted( self.diffs_counter.keys() ):
             output.append( layer )
