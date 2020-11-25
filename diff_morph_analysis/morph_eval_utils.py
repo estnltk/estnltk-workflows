@@ -509,7 +509,11 @@ class MorphDiffFinder:
 
 
 class MorphDiffSummarizer:
-    '''Aggregates and summarizes morph_analysis annotations difference statistics based on information from diff layers.'''
+    '''Aggregates and summarizes morph_analysis span & annotation difference statistics based on information from 
+       diff layers. The class is based on  SegmentDiffSummarizer & MorphDiffSummarizer  from: 
+          https://github.com/estnltk/eval_experiments_lrec_2020/blob/master/scripts_and_data/segm_eval_utils.py
+          https://github.com/estnltk/eval_experiments_lrec_2020/blob/master/scripts_and_data/morph_eval_utils.py
+    '''
 
     def __init__(self, first_model, second_model):
         """Initializes MorphDiffSummarizer.
@@ -522,6 +526,7 @@ class MorphDiffSummarizer:
         self.diffs_counter = {}
         self.first_model    = first_model
         self.second_model   = second_model
+        self.has_span_differences = False
     
     def record_from_diff_layer( self, layer_name, layer, text_category, start_new_doc=True ):
         """Records differences in given document, based on the statistics in metadata of diff_layer.
@@ -547,6 +552,9 @@ class MorphDiffSummarizer:
             self.diffs_counter[layer_name]['total'] = defaultdict(int)
         for key in layer.meta:
             self.diffs_counter[layer_name]['total'][key] += layer.meta[key]
+            if key in ['missing_spans', 'extra_spans'] and layer.meta[key] > 0:
+                # Span differences encountered ...
+                self.has_span_differences = True
         if start_new_doc:
             self.diffs_counter[layer_name]['total']['_docs'] += 1
         if text_category not in self.diffs_counter[layer_name]:
@@ -576,6 +584,46 @@ class MorphDiffSummarizer:
             assert 'total' in self.diffs_counter[layer]
             diff_categories.append('total')
             longest_cat_name = max( [len(k) for k in diff_categories] )
+            #
+            # 1) Similarity in spans (if there were any span differences)
+            #
+            if self.has_span_differences:
+                output.append( '\n' )
+                output.append( ' span similarity:' )
+                output.append( '\n' )
+                for category in diff_categories:
+                    src = self.diffs_counter[layer][category]
+                    if category == 'total' and single_category:
+                        # No need to display TOTAL, if there was only one category
+                        continue
+                    if category == 'total':
+                        category = 'TOTAL'
+                    output.append( (' {:'+str(longest_cat_name+1)+'}').format(category) )
+                    if show_doc_count:
+                        output.append('|')
+                        output.append(' #docs: {} '.format(src['_docs']) )
+                    # unchanged_spans + modified_spans + missing_spans = length_of_old_layer
+                    # unchanged_spans + modified_spans + extra_spans = length_of_new_layer
+                    first_layer_len  = src['unchanged_spans'] + src['modified_spans'] + src['missing_spans']
+                    second_layer_len = src['unchanged_spans'] + src['modified_spans'] + src['extra_spans']
+                    total_spans = first_layer_len + second_layer_len
+                    # Ratio: https://docs.python.org/3.6/library/difflib.html#difflib.SequenceMatcher.ratio
+                    ratio = (src['unchanged_spans']*2.0) / total_spans
+                    output.append('|')
+                    output.append(' sim ratio: {} / {}  ({:.4f}) '.format(src['unchanged_spans']*2, total_spans, ratio ))
+                    missing_percent = (src['missing_spans']/total_spans)*100.0
+                    output.append('|')
+                    output.append(' only in {}: {} ({:.4f}%) '.format(self.first_model, src['missing_spans'], missing_percent ))
+                    extra_percent = (src['extra_spans']/total_spans)*100.0
+                    output.append('|')
+                    output.append(' only in {}: {} ({:.4f}%) '.format(self.second_model, src['extra_spans'], extra_percent ))
+                    output.append('\n')
+                output.append('\n')
+                output.append( ' annotation similarity:' )
+                output.append( '\n' )
+            #
+            # 2) Similarity in annotations (modified overlapping spans + annotation sim ratio)
+            #
             for category in diff_categories:
                 src = self.diffs_counter[layer][category]
                 if category == 'total' and single_category:
@@ -587,8 +635,6 @@ class MorphDiffSummarizer:
                 if show_doc_count:
                     output.append('|')
                     output.append(' #docs: {} '.format(src['_docs']) )
-                # unchanged_spans + modified_spans + missing_spans = length_of_old_layer
-                # unchanged_spans + modified_spans + extra_spans = length_of_new_layer
                 # unchanged_annotations + missing_annotations = number_of_annotations_in_old_layer
                 # unchanged_annotations + extra_annotations   = number_of_annotations_in_new_layer
                 
