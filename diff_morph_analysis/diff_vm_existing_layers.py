@@ -1,6 +1,6 @@
 #
 #  Compares two layers of (Vabamorf's) morphological annotations in PostgreSQL
-#  collection annotated, and finds differences in annotations.
+#  collection, and finds differences in annotations.
 #  
 #  Outputs summarized statistics about differences, and writes all differences into a 
 #  file. The output will be written into a directory named 'diff_' + collection's name.
