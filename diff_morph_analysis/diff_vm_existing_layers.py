@@ -168,7 +168,7 @@ if __name__ == '__main__':
                 fname_stub = 'doc' + str(key)
                 if args.file_name_key is not None:
                     if args.file_name_key in text.meta.keys() and text.meta[args.file_name_key] is not None:
-                        fname_stub = text.meta[ args.file_name_key ]
+                        fname_stub = text.meta[ args.file_name_key ]+f'({key})'
                 text_cat = 'corpus'
                 if args.text_cat_key is not None:
                     if args.text_cat_key in text.meta.keys() and text.meta[args.text_cat_key] is not None:
