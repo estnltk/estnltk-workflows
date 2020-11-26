@@ -26,6 +26,7 @@ from estnltk.taggers.standard_taggers.diff_tagger import iterate_diff_conflicts
 from conf_utils import pick_random_doc_ids
 from conf_utils import create_ner_tagger
 from conf_utils import flip_ner_input_layer_names
+from conf_utils import load_in_doc_ids_from_file
 
 from ner_diff_utils import NerDiffFinder
 from ner_diff_utils import NerDiffSummarizer
@@ -99,6 +100,11 @@ if __name__ == '__main__':
                              "difference evaluation. if specified, then the given amount of documents will be "+\
                              "processed (instead of processing the whole corpus). if the amount exceeds the "+\
                              "corpus size, then the whole corpus is processed. (default: None)" )
+    parser.add_argument('-f', '--file_pick', dest='file_pick', action='store', type=str, \
+                        help="name of the file containing indexes of the documents that need to be processed "+\
+                             "in the difference evaluation. if specified, then only documents listed in the "+\
+                             "file will be processed (instead of processing the whole corpus). note: each "+\
+                             "document id must be on a separate line in the index file. (default: None)" )
     parser.add_argument('--out_dir_prefix', dest='out_dir_prefix', action='store', default='diff_',\
                         help="a prefix that will be added to the output directory name. the output directory "+\
                              " name will be: this prefix concatenated with the name of the collection. "+\
@@ -128,11 +134,16 @@ if __name__ == '__main__':
                                                                               docs_in_collection ))
             log.info(' Collection {!r} has layers: {!r} '.format( args.collection, 
                                                                    collection.layers ))
-            # Pick a random sample (instead of the whole corpus)
+            
             chosen_doc_ids = []
             if args.rand_pick is not None and args.rand_pick > 0:
+                # Pick a random sample (instead of the whole corpus)
                 chosen_doc_ids = pick_random_doc_ids( args.rand_pick, storage, args.schema, args.collection, logger )
                 log.info(' Random sample of {!r} documents chosen for processing.'.format( len(chosen_doc_ids) ))
+            elif args.file_pick is not None:
+                # Or load target document indexes from the file
+                chosen_doc_ids = load_in_doc_ids_from_file( args.file_pick, storage, args.schema, args.collection, logger)
+                log.info(' {!r} document indexes loaded from {!r} for processing.'.format( len(chosen_doc_ids), args.file_pick ))
             
             ner_tagger, ner_input_layers_mapping = create_ner_tagger( args.ner_layer, collection, log, args.new_ner_layer,
                                                                       incl_prefix=args.in_prefix, incl_suffix=args.in_suffix )

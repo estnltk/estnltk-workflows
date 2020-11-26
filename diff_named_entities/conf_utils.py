@@ -7,7 +7,7 @@
 # =========================================================
 # =========================================================
 
-import os, os.path, re
+import os, os.path, re, sys
 from collections import defaultdict
 from random import sample
 
@@ -53,6 +53,33 @@ def pick_random_doc_ids( k, storage, schema, collection, logger, sort=True ):
     resulting_sample = sample(all_doc_ids, k) if k < len(all_doc_ids) else all_doc_ids
     return sorted(resulting_sample) if sort else resulting_sample
 
+
+
+def load_in_doc_ids_from_file( fnm, storage, schema, collection, logger, sort=True ):
+    '''Loads processable document ids from a text file. 
+       In the text file, each document id should be on a separate line. 
+       Returns a list with document ids.
+    '''
+    if not os.path.isfile( fnm ):
+        log.error('Error at loading document index: invalid index file {!r}. '.format( fnm ))
+        exit(1)
+    all_doc_ids = set(fetch_document_indexes(storage, schema, collection, logger))
+    ids = []
+    with open( fnm, 'r', encoding='utf-8' ) as f:
+       for line in f:
+           line = line.strip()
+           if len(line) == 0:
+              continue
+           if int(line) not in all_doc_ids  and  line not in all_doc_ids:
+              logger.warning(f'Document id {line} is missing from {collection} indexes. Skipping id.')
+              continue
+           ids.append( int(line) )
+    if len(ids) == 0:
+        log.error('No valid document ids were found from the index file {!r}.'.format( fnm ))
+        exit(1)
+    if sort:
+        ids = sorted( ids )
+    return ids
 
 
 # =================================================
