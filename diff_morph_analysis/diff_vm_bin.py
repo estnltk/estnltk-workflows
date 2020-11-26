@@ -28,6 +28,7 @@ from morph_eval_utils import MorphDiffSummarizer, MorphDiffFinder
 
 from conf_utils import create_vm_tagger_based_on_vm_instance
 from conf_utils import pick_random_doc_ids
+from conf_utils import load_in_doc_ids_from_file
 from conf_utils import create_vm_tagger
 from conf_utils import find_division_into_chunks
 
@@ -117,6 +118,11 @@ if __name__ == '__main__':
                              "difference evaluation. if specified, then the given amount of documents will be "+\
                              "processed (instead of processing the whole corpus). if the amount exceeds the "+\
                              "corpus size, then the whole corpus is processed. (default: None)" )
+    parser.add_argument('-f', '--file_pick', dest='file_pick', action='store', type=str, \
+                        help="name of the file containing indexes of the documents that need to be processed "+\
+                             "in the difference evaluation. if specified, then only documents listed in the "+\
+                             "file will be processed (instead of processing the whole corpus). note: each "+\
+                             "document id must be on a separate line in the index file. (default: None)" )
     args = parser.parse_args()
 
     logger.setLevel( (args.logging).upper() )
@@ -170,11 +176,16 @@ if __name__ == '__main__':
                                                                               docs_in_collection ))
             log.debug(' Collection {!r} has layers: {!r} '.format( args.collection, 
                                                                    collection.layers ))
-            # Pick a random sample (instead of the whole corpus)
+            
             chosen_doc_ids = []
             if args.rand_pick is not None and args.rand_pick > 0:
+                # Pick a random sample (instead of the whole corpus)
                 chosen_doc_ids = pick_random_doc_ids( args.rand_pick, storage, args.schema, args.collection, logger )
                 log.info(' Random sample of {!r} documents chosen for processing.'.format( len(chosen_doc_ids) ))
+            elif args.file_pick is not None:
+                # Or load target document indexes from the file
+                chosen_doc_ids = load_in_doc_ids_from_file( args.file_pick, storage, args.schema, args.collection, logger)
+                log.info(' {!r} document indexes loaded from {!r} for processing.'.format( len(chosen_doc_ids), args.file_pick ))
             
             if not re.match('^\.{3,}$', args.vm_bin_dir):
                 # Create VabamorfTagger based on given binary lexicon files
