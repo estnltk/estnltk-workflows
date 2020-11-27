@@ -1,5 +1,5 @@
 #
-#  Builds a document word index from a corpus in Postgres collection. 
+#  Builds word count index from a corpus in Postgres collection. 
 #  The index shows character and word counts (and optionally 
 #  sentence counts and some text metadata) for each document in 
 #  the corpus. 
@@ -26,7 +26,7 @@ INDEX_FIELD_DELIMITER = '|||'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
-       "Builds a document word index from a corpus in Postgres collection. "+
+       "Builds word count index from a corpus in Postgres collection. "+
        "The index shows character and word counts (and optionally "+
        "sentence counts and some text metadata) for each document in "+
        "the corpus. ")

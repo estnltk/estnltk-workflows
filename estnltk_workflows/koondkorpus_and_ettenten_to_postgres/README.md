@@ -76,4 +76,4 @@ For detailed help about the command, run: `python store_ettenten_in_pgcollection
 
 There are also some additional scripts that may be helpful for managing large PostgreSQL collections like etTenTen and koondkorpus.
 
- * **`build_pgcollection_index.py`** -- Builds a document word index from a corpus in given Postgres collection. The index shows character and word counts (and optionally sentence counts and some text metadata) for each document in the corpus. For detailed usage information, run: `python build_pgcollection_index.py -h`
+ * **`build_pgcollection_index.py`** -- Builds word count index from a corpus in given Postgres collection. The index shows character and word counts (and optionally sentence counts and some text metadata) for each document in the corpus. For detailed usage information, run: `python build_pgcollection_index.py -h`
