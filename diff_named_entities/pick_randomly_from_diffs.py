@@ -13,7 +13,7 @@ from math import floor
 
 from collections import defaultdict
 
-from random import randint
+from random import randint, seed
 
 from estnltk import logger
 
@@ -30,6 +30,8 @@ if __name__ == '__main__':
     parser.add_argument('rand_pick', type=int, \
                         help="integer value specifying the amount of differences "+\
                              "to be randomly chosen from the ann_diffs_file." )
+    parser.add_argument('--seed', dest='random_seed_value', action='store', type=int, default=1,\
+                        help="seed value used in making the random selection (default: 1).")
     parser.add_argument('-e', '--even', dest='pick_evenly', default=False, action='store_true', \
                         help="If set, attempts to pick even amount of random differences "+
                              "from each text subcategory / subcorpus. Note: this may fail due "+
@@ -52,6 +54,7 @@ if __name__ == '__main__':
     rand_pick = args.rand_pick
     diff_file = args.ann_diffs_file
     pick_evenly = args.pick_evenly
+    random_seed_value = args.random_seed_value
     assert os.path.exists( diff_file ), '(!) Input file {} not found!'.format( diff_file )
     if '__ann_diffs_' not in diff_file:
         log.warn( f'The input file  {diff_file}  does not contain substring "__ann_diffs_". Is it correct file?' )
@@ -101,6 +104,7 @@ if __name__ == '__main__':
         log.warn(f'Unable to make an even pick from {categories_meeting_even_pick_size} / {categories} categories. Discarding pick_evenly setting.')
         pick_evenly = False
     
+    seed( random_seed_value )
     diff_gap_picks_flat = None
     if pick_evenly and even_pick_size > 0:
         # Make an even pick over all categories
