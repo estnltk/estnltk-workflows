@@ -132,7 +132,7 @@ if __name__ == '__main__':
         diff_gap_picks_flat = sorted( [p for s in diff_gap_picks.keys() for p in diff_gap_picks[s]] )
     else:
         # Make a pick over the whole corpus
-        all_diff_gaps = [df_gap for k in diff_gaps.keys() for df_gap in diff_gaps[k]]
+        all_diff_gaps = [df_gap for k in sorted(diff_gaps.keys()) for df_gap in diff_gaps[k]]
         assert len(all_diff_gaps) == total_differences
         log.info(f'Picking randomly {rand_pick} differences from the whole corpus ...')
         diff_gap_picks = set()
