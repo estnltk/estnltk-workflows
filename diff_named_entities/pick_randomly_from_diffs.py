@@ -94,15 +94,16 @@ if __name__ == '__main__':
     log.info('')
     log.info( f' {total}  (100.0%)  TOTAL')
     log.info('')
-    if even_pick_size == 0:
-        log.warn(f'Unable to make an even pick: there are {categories} categories, but only {rand_pick} can be chosen. Discarding pick_evenly setting.')
-        pick_evenly = False
-    elif rand_pick % categories != 0:
-        log.warn(f'Unable to make an even pick from all {categories} categories: {rand_pick % categories} pick(s) will remain. Discarding pick_evenly setting.')
-        pick_evenly = False
-    elif categories_meeting_even_pick_size < categories:
-        log.warn(f'Unable to make an even pick from {categories_meeting_even_pick_size} / {categories} categories. Discarding pick_evenly setting.')
-        pick_evenly = False
+    if pick_evenly:
+        if even_pick_size == 0:
+            log.warn(f'Unable to make an even pick: there are {categories} categories, but only {rand_pick} can be chosen. Discarding pick_evenly setting.')
+            pick_evenly = False
+        elif rand_pick % categories != 0:
+            log.warn(f'Unable to make an even pick from all {categories} categories: {rand_pick % categories} pick(s) will remain. Discarding pick_evenly setting.')
+            pick_evenly = False
+        elif categories_meeting_even_pick_size < categories:
+            log.warn(f'Unable to make an even pick from {categories_meeting_even_pick_size} / {categories} categories. Discarding pick_evenly setting.')
+            pick_evenly = False
     
     seed( random_seed_value )
     diff_gap_picks_flat = None
