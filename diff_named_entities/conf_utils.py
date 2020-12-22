@@ -197,10 +197,34 @@ def create_ner_tagger( old_ner_layer, collection, log, new_ner_layer,
     # TODO: NerTagger's current interface does not allow to properly use customized 
     #       layer names, as names of the default layers are hard-coded. Therefore,
     #       we cannot specify collection's input layers upon initialization of NerTagger,
-    #       but we return then so that they can be used for quiering the collection;
+    #       but we return them so that they can be used for quiering the collection;
     #
     ner_tagger = NerTagger( output_layer=new_ner_layer )
     log.info(' Initialized {!r} for evaluation. '.format( ner_tagger ) )
     return ner_tagger, input_layers_mapping
 
+
+def create_ner_tagger_from_model( ner_layer, model_location, collection, log, 
+                                  incl_prefix='', incl_suffix='' ):
+    ''' Creates NerTagger from specific model with the input layers 
+        from given collection. 
+        Collects input layers of the tagger based on the layers 
+        available in the collection. '''
+    # NerTagger's input layers
+    default_ner_input_layers = ['morph_analysis', 'words', 'sentences']
+    # Mapping from NerTagger's input layers to corresponding layers in the collection
+    input_layers_mapping = \
+        find_ner_dependency_layers( default_ner_input_layers, ner_layer, collection, log,
+                                    incl_prefix=incl_prefix, incl_suffix=incl_suffix )
+    #
+    # TODO: NerTagger's current interface does not allow to properly use customized 
+    #       layer names, as names of the default layers are hard-coded. Therefore,
+    #       we cannot specify collection's input layers upon initialization of NerTagger,
+    #       but we return them so that they can be used for quiering the collection;
+    #
+    assert os.path.isdir(model_location), \
+           '(!) Invalid model_dir for NerTagger: {}'.format(model_location)
+    ner_tagger = NerTagger( output_layer=ner_layer, model_dir = model_location )
+    log.info(' Initialized {!r} for evaluation. '.format( ner_tagger ) )
+    return ner_tagger, input_layers_mapping
 
