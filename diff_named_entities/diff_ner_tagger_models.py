@@ -1,5 +1,5 @@
 #
-#  Runs two NerTagger's models given PostgreSQL collection. 
+#  Runs two NerTagger's models on given PostgreSQL collection. 
 #  Finds differences between NE annotations produced by two models. 
 #  The collection must have input_layers required by NerTagger.
 #  
@@ -37,7 +37,7 @@ from ner_diff_utils import write_formatted_diff_str_to_file
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
-       "Runs two NerTagger models given PostgreSQL collection. "+
+       "Runs two NerTagger models on given PostgreSQL collection. "+
        "Finds differences between NE annotations produced by two models. "+
        "Outputs summarized statistics about differences, and writes all differences into a "+
        "file. By default, the output will be written into a directory named 'diff_' + "+
