@@ -2,7 +2,7 @@
 
 Scripts for running Vabamorf's morphological analyzer on a PostgreSQL collection that has morphological annotations, and comparing old and new morphological annotations.
 
-Requirements: Python 3.6+, [Psycopg 2](https://www.psycopg.org), EstNLTK v1.6.7+
+Requirements: Python 3.6+, [Psycopg 2](https://www.psycopg.org), EstNLTK v1.6.8+
 
 * `diff_vm_bin.py` -- Runs VabamorfTagger with given binary lexicons on a morphologically annotated PostgreSQL collection. Finds differences between old and new morphological annotations. Outputs summarized statistics about differences, and writes all differences into a file. For detailed usage information, run: `python diff_vm_bin.py -h`
 

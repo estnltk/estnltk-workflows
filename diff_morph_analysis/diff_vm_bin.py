@@ -18,7 +18,7 @@ from datetime import timedelta
 
 from estnltk import logger
 from estnltk.storage.postgres import PostgresStorage
-from estnltk.storage.postgres import KeysQuery
+from estnltk.storage.postgres import IndexQuery
 
 from estnltk.taggers import DiffTagger
 from estnltk.layer_operations import extract_section
@@ -222,7 +222,7 @@ if __name__ == '__main__':
             eval_layers = list(vm_tagger.input_layers) + [args.morph_layer]
             data_iterator = None
             if chosen_doc_ids:
-                data_iterator = collection.select( KeysQuery(keys=chosen_doc_ids), progressbar='ascii', layers=eval_layers )
+                data_iterator = collection.select( IndexQuery(keys=chosen_doc_ids), progressbar='ascii', layers=eval_layers )
             else:
                 data_iterator = collection.select( progressbar='ascii', layers=eval_layers )
             last_was_huge_file = False
