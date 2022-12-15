@@ -199,6 +199,8 @@ def pick_randomly_from_errors_jsonl_file(input_file, rand_pick, random_seed_valu
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=
        "Selects a random subset of inconsistencies/errors from input file. "+
+       "The input file can be either log file of errors, or jsonl file with "+
+       "erroneous sentences. "+
        "By default, the chosen subset of inconsistencies will be written into a "+
        "file named as: the original file name + '_x' + amount of randomly "+
        "chosen differences. ")
