@@ -29,10 +29,16 @@ def pick_randomly_from_errors_text_file(input_file, rand_pick, random_seed_value
     # ==================================================
     # mis_kes_embedded_clause_wrong_end::1
     pattern_separator = re.compile('^\s*={30,}\s*$')
+    pattern_final_separator = re.compile('^\s*={10,}\s+Final statistics\s+={10,}$')
     pattern_log_info  = re.compile('^\s*INFO:([^:]+):(\d+):\s*$')
     pattern_err_index = re.compile('^\s*([^:]+)::(\d+)\s*$')
-    pattern_log_info_text_id = \
+    pattern_layer_debug_output = re.compile("^>\s*'([^']+)'\s'([^']+)'\s'([^']+)'\s*$")
+    # console output
+    pattern_log_info_text_id_1 = \
         re.compile('^\s*INFO:([^:]+):(\d+):\s*\(\!\) clauses_errors in (text with id .+)$')
+    # log file output
+    pattern_log_info_text_id_2 = \
+        re.compile('^\s*\(\!\) clauses_errors in (text with id .+)$')
     # INFO:clauses_vs_syntax_consistency_in_koondkorpus.py:116: (!) clauses_errors in text with id 684 (aja_kr_2001_12_18.xml)
     log.info('Collecting error indexes ...')
     errs = []
@@ -47,10 +53,18 @@ def pick_randomly_from_errors_text_file(input_file, rand_pick, random_seed_value
             line = line.strip()
             sep_indx_match = pattern_separator.match( line )
             log_info_match = pattern_log_info.match( line )
-            log_info_match_text_id = \
-                pattern_log_info_text_id.match( line )
-            if log_info_match_text_id:
-                last_text_id = log_info_match_text_id.group(3)
+            final_sep_match = pattern_final_separator.match( line )
+            layer_debug_match = pattern_layer_debug_output.match( line )
+            # console output
+            log_info_match_text_id_1 = \
+                pattern_log_info_text_id_1.match( line )
+            if log_info_match_text_id_1:
+                last_text_id = log_info_match_text_id_1.group(3)
+            # log file output
+            log_info_match_text_id_2 = \
+                pattern_log_info_text_id_2.match( line )
+            if log_info_match_text_id_2:
+                last_text_id = log_info_match_text_id_2.group(1)
             err_index_match = pattern_err_index.match( line )
             if err_index_match and last_was_sep and len(collected)==0:
                 can_be_collected = True
@@ -65,13 +79,18 @@ def pick_randomly_from_errors_text_file(input_file, rand_pick, random_seed_value
                         collected = [last_line, 'in '+last_text_id, last_line]
             if len(collected) > 0:
                 # check stopping criteria
-                if log_info_match is not None or sep_indx_match is not None:
+                if log_info_match is not None or \
+                   sep_indx_match is not None or \
+                   final_sep_match is not None:
                     # empty collected buffer
                     errs.append( collected )
                     collected = []
                 else:
                     # continue
-                    collected.append(line)
+                    if layer_debug_match is None and \
+                       log_info_match_text_id_1 is None and \
+                       log_info_match_text_id_2 is None:
+                        collected.append(line)
             last_line = line
             last_was_log_match = log_info_match is not None
             last_was_err_indx  = err_index_match is not None
