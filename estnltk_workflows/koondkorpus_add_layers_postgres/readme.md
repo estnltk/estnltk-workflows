@@ -17,27 +17,25 @@ For tagging a layer, you need the following configurations:
 
 ### Scripts
 
-* `01_add_base_layer.py` -- depending on the input configuration, adds either a segmentation layer (`"tokens"`, `"compound_tokens"`,  `"words"`, `"sentences"`, `"paragraphs"`) or a morphological analysis layer (`"morph_analysis"` or `"morph_extended"`). Example usage:
+* `01_add_base_layer.py` -- depending on the input configuration, adds either a segmentation layer (`"tokens"`, `"compound_tokens"`,  `"words"`, `"sentences"`, `"paragraphs"`) or a morphological analysis layer (`"morph_analysis"` or `"morph_extended"`). Example usages:
 
 	`python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_01_add_tokens.ini`
 
 	`python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_04_add_sentences.ini`
 
-* `02_add_morph_analysis_layer.py` -- adds morph\_analysis layer;
- 
-* `03_add_morph_extended_layer.py` -- adds morph\_extended layer;
+	`python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini`
 
-* `04_add_clauses_layer.py` -- adds clauses layer;
+* `02_add_clauses_layer.py` -- adds clauses layer;
 
-* `04_add_composite_stanza_syntax_layer.py` -- adds stanza syntax layer via a composite tagger. Essentially, this tagger creates two layers: the morph\_extended layer, which is an input layer required by the syntax tagger, and the stanza's syntax layer (which  will be the final output layer). The morph\_extended layer will be disposed after it is no longer needed;
+* `02_add_named_entities_layer.py` -- adds named entities layer with EstNLTK's basic NerTagger;
 
-* `04_add_named_entities_layer.py` -- adds named entities layer with EstNLTK's basic NerTagger;
+* `02_add_pre_timexes_layer.py` -- adds pre\_timexes layer with EstNLTK's TimexPhrasesTagger;
 
-* `04_add_pre_timexes_layer.py` -- adds pre\_timexes layer with EstNLTK's TimexPhrasesTagger;
+* `02_add_composite_stanza_syntax_layer.py` -- adds stanza syntax layer via a composite tagger. Essentially, this tagger creates two layers: the morph\_extended layer, which is an input layer required by the syntax tagger, and the stanza's syntax layer (which  will be the final output layer). The morph\_extended layer will be disposed after it is no longer needed;
 
-* `05_add_stanza_syntax_layer.py` -- adds stanza syntax layer. Note that depending on the model used, this tagger requires that input morph\_extended or morph\_analysis layers already exist in the database. If you do not want to save morph\_extended layer to the database, use the script `04_add_composite_stanza_syntax_layer.py` instead.
+* `02_add_stanza_syntax_layer.py` -- adds stanza syntax layer. Note that depending on the model used, this tagger requires that input morph\_extended or morph\_analysis layers already exist in the database. If you do not want to save morph\_extended layer to the database, use the script `02_add_composite_stanza_syntax_layer.py` instead.
 
-Note: all of the scripts create detached layers.
+Note: all scripts create detached layers.
 
 ### Data parallelization
 
@@ -50,9 +48,9 @@ Example 1: Launch two separate jobs for `tokens` annotation:
 
 Example 2: Launch three separate jobs for `morph_analysis` annotation:
 
-`$ python  02_add_morph_analysis_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,0`
-`$ python  02_add_morph_analysis_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,1`
-`$ python  02_add_morph_analysis_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,2`
+`$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,0`
+`$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,1`
+`$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,2`
 
 
 
