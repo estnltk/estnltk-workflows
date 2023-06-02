@@ -1,6 +1,6 @@
-# Workflows for annotating layers in PostgreSQL's collections
+# Workflows for annotating layers in Koondkorpus' PostgreSQL collections
 
-This folder contains command line workflows for adding EstNLTK's annotation layers to PostgreSQL's collections.
+This folder contains command line workflows for adding EstNLTK's annotation layers to Koondkorpus' collections in PostgreSQL DB.
 
 ### Requirements
 
