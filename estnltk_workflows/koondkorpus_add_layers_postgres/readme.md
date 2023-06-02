@@ -44,12 +44,15 @@ Each of the annotation scripts also supports data parallelization: you can launc
 Example 1: Launch two separate jobs for `tokens` annotation:
 
 `$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_01_add_tokens.ini  2,0`
+
 `$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_01_add_tokens.ini  2,1`
 
 Example 2: Launch three separate jobs for `morph_analysis` annotation:
 
 `$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,0`
+
 `$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,1`
+
 `$ python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_05_add_morph_analysis.ini  3,2`
 
 
