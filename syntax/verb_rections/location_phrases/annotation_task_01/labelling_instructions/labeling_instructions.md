@@ -1,12 +1,10 @@
 # Verbi rektsioonide märgendamine
 
-## I. Märgendamise eesmärk
-
 Verbile alluvatel nimisõnafraasidel võib olla mitu semantilist tähendust.
 Näiteks fraasidel
 
-> Ma räägin sinule
-> Ma jooksen palliplatsile
+> Ma räägin sinule <br>
+> Ma jooksen palliplatsile <br>
 > Lükkasime kohtumise kella kolmele
 
 on täiesti erinevad tähendused. Neist esimeses on sinule osaline rääkimisprotsessis.
@@ -14,6 +12,9 @@ Formaalselt kuulub ta rääkima argumendistruktuuri. Teises näites on palliplat
 kuhu minnakse ning kolmandas näites on kella kolmele aeg, kuhu kohtumine lükatakse.
 See millises rollis on nimisõnafraas on määratud ära verbifraasi, laiendi juursõna
 käände ja laiendi juursõna tähenduse poolt.
+
+
+## I. Märgendamise eesmärk
 
 Antud märgendamise esmane eesmärk on tuvastada juhud, kus laiendi semantilise tähenduse
 määramiseks piisab vaid verbi ja selle käände teadmisest. Näiteks kombinatsioon
