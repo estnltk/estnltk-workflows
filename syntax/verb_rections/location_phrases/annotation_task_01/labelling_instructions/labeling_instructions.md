@@ -18,9 +18,9 @@ käände ja laiendi juursõna tähenduse poolt.
 
 Antud märgendamise esmane eesmärk on tuvastada juhud, kus laiendi semantilise tähenduse
 määramiseks piisab vaid verbi ja selle käände teadmisest. Näiteks kombinatsioon
-rääkima + millele = kuhu on võimatu. Sama moodi on võimatu fraas jooksen sinule.  
+`rääkima + millele = kuhu` on võimatu. Sama moodi on võimatu fraas `jooksen sinule`.  
 
-Lihtsustamaks verb + kääne kategoriseerimist oleme me suurest tekstikorpusest välja
+Lihtsustamaks `verb + kääne` kategoriseerimist oleme me suurest tekstikorpusest välja
 valinud kümme näitelauset, mille põhjal saab valikut teha.
 
 [Lisa siia näide]
