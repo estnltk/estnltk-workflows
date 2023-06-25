@@ -26,6 +26,7 @@ valinud kümme näitelauset, mille põhjal saab valikut teha.
 [Lisa siia näide]
 
 
+## II. Märgendamisülesande üldine kirjeldus
 
 Märgendamiseks tuleb hinnata kui sagedasti on nimisõnafraas
 
