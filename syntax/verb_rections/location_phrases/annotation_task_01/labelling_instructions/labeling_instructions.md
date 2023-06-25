@@ -1,15 +1,15 @@
 # Verbi rektsioonide märgendamine
 
 Verbile alluvatel nimisõnafraasidel võib olla mitu semantilist tähendust.
-Näiteks fraasidel
+Näiteks on samas alaleütlevas käändes fraasidel
 
 > Ma räägin sinule <br>
 > Ma jooksen palliplatsile <br>
 > Lükkasime kohtumise kella kolmele
 
-on täiesti erinevad tähendused. Neist esimeses on sinule osaline rääkimisprotsessis.
-Formaalselt kuulub ta rääkima argumendistruktuuri. Teises näites on palliplats koht,
-kuhu minnakse ning kolmandas näites on kella kolmele aeg, kuhu kohtumine lükatakse.
+täiesti erinevad tähendused. Neist esimeses on `sinule` osaline rääkimisprotsessis.
+Formaalselt kuulub ta rääkima argumendistruktuuri. Teises näites on `palliplats` koht,
+kuhu minnakse ning kolmandas näites on `kella kolmele` aeg, kuhu kohtumine lükatakse.
 See millises rollis on nimisõnafraas on määratud ära verbifraasi, laiendi juursõna
 käände ja laiendi juursõna tähenduse poolt.
 
