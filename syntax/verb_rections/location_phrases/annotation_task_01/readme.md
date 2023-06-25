@@ -8,7 +8,7 @@ The goal of this labelling task is to identify:
 
 As it is difficult to draw a clear line between these categories, we ask
 questions that easier to answer and yield more informative responses.
-See the [labelling instructions](labelling_instructions.md) for further details.
+See the [labelling instructions](./labelling_instructions) for further details.
 
 
 ## II. Annotation tasks
