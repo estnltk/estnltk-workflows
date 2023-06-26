@@ -186,7 +186,7 @@ Ka sõnad, mis ei ole käändes, aga millel on juhtumisi vastav käändelõpp:
 
 Vale sõna on märgendatud obl-iks:
 
-"Need liiguvad Lioni näolt laual asetsevatele *mustadele*, elusuurusest justkui isegi suurematele ametitelefonidele ja telefonidelt jälle tagasi Lioni näole."
+- "Need liiguvad Lioni näolt laual asetsevatele *mustadele*, elusuurusest justkui isegi suurematele ametitelefonidele ja telefonidelt jälle tagasi Lioni näole."
 &rArr;  korrektne oleks märkida *ametitelefonidele* obl-iks
 
 
