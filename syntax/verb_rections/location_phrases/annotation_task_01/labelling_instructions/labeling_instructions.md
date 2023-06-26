@@ -21,47 +21,62 @@ määramiseks piisab vaid verbi ja selle käände teadmisest. Näiteks kombinats
 `rääkima + millele = kuhu` on võimatu. Sama moodi on võimatu fraas `jooksen sinule`.  
 
 Lihtsustamaks `verb + kääne` kategoriseerimist oleme me suurest tekstikorpusest välja
-valinud kümme näitelauset, mille põhjal saab valikut teha.
+valinud kümme näitelauset, mille põhjal saab valikut teha. Selles on erinevate värvidega ära märgitud verb või verbi fraas, nimisõnafraasi juursõna ning selle ülejäänud osad.
 
-[Lisa siia näide]
+> **rääkima - in (kelles/milles)**
+> 
+> Tagatipuks <span style="background-color:rgba(122, 193, 48, 0.3)">rääkige</span> mulle suurtest pragudest <span style="background-color:rgba(234, 86, 100, 0.3)">oma korteri magamistoa</span> <span style="background-color:rgba(7, 149, 226, 0.3)">seinas</span>. 
+>
+> <span style="background-color:rgba(122, 193, 48, 0.3)">Rääkis</span> kord tuttav vormsilane <span style="background-color:rgba(7, 149, 226, 0.3)">kodukeskkonnas</span></span> pisikese viskiklaasi kõrvale järgmise loo.
+> 
+> Hispaania keelt <span style="background-color:rgba(122, 193, 48, 0.3)">räägib</span> <span style="background-color:rgba(7, 149, 226, 0.3)">Californias</span></span> emakeelena rohkem inimesi kui inglise keelt. 
+
 
 
 ## II. Märgendamisülesande üldine kirjeldus
 
 Märgendamiseks tuleb hinnata kui sagedasti on nimisõnafraas
 
-1) koha või ajamäärus
-2) isik või organisatsioon
-3) muu (täpsustub peale esialgset märgendamist)
+1. koha- või ajamäärus
+2. isik või organisatsioon
 
-Oluline on märgendamisel tähele panna, et me loeme sündmused ka koha või ajamääruseks.
+Lisaks eelnevale on olemas ka valik `muu`, mille abil saab anda edasi muud olulist informatsiooni:
 
-Ma osalesin Tartu kevadlaadal
-Ma läksin Peetri sünnipäevale
+* ebakindlust märgendamise suhtes;
+* raporteerida nimisõnafraasides esinevaid vigu.  
 
-Seda eelkõige sellepärast, et need täpsustavad tegevuse toimumise kohta ja aega ning sageli pole võimalik määrata kumba neist täpselt. Näiteks Tartu kevadlaat toimub Tartus ja ka kevadel ning see kas see määrab ära aja või koha sõltub kontekstist.
+Kuna koha- ja ajamääruste definitsioon on hägune, siis loeme sündmused ka koha või ajamääruseks.
 
-Märgendamisel tuleb otsutada kui sagedasti nimisõnafraas on vastavas rollis. Selleks saab teha kolm valikut. Alati ja mitte kunagi ei ole siin absoluutsed. Lingvistid oskavad alati iga väite kummutamiseks moodutada erakorralisi kontranäiteid. Lihtsustatult võib kvantifikatsioonist alati mõelda kui 19 juhul 20-st ja mitte kunagist kui 1 juhul 20-st. Kvantifikatsioon vahel tähendab seda, et sul on lihtne ette kujutada olukordi, kus nimisõnafraas on antud rollis ja olukordi kus  see ei ole antud rollis.
+> Ma osalesin <span style="background-color:rgba(7, 149, 226, 0.3)">Tartu kevadlaadal</span>.
+> 
+> Ma läksin <span style="background-color:rgba(7, 149, 226, 0.3)">Peetri sünnipäevale</span>.
+
+Seda eelkõige sellepärast, et need täpsustavad tegevuse toimumise kohta ja aega ning sageli pole võimalik määrata kumba neist täpselt. Näiteks `Tartu kevadlaat` toimub Tartus ja ka kevadel ning see kas see määrab ära aja või koha sõltub kontekstist.
+
+Märgendamisel tuleb otsutada kui sagedasti nimisõnafraas on vastavas rollis. Selleks saab teha kolm valikut:
+
+*  alati
+*  vahel
+*  mitte kunagi
+
+Neist valikutest on informatiivsed vaid `alati` ja `mitte kunagi`. Kuna lingvistid oskavad alati iga väite kummutamiseks moodutada erakorralisi kontranäiteid, siis ei ole märgendid `alati` ja `mitte kunagi`  absoluutsed. Lihtsustatult võib kvantifikatsioonist alati mõelda kui 19 juhul 20-st ja mitte kunagist kui 1 juhul 20-st. Kvantifikatsioon vahel tähendab seda, et sul on lihtne ette kujutada olukordi, kus nimisõnafraas on antud rollis ja olukordi kus  see ei ole antud rollis.
+
+Näiteks kui lausegrupis on  kolm lauset ja iga lause puhul on fraas kohamäärus, siis tuleb märgendada järgenvalt:
+
+1. koha- või ajamäärus &rArr; alati
+2. isik või organisatsioon &rArr; mitte kunagi
+
+Kui aga nimisõnafraas on vahel kohamäärus aga siiski mitte kunagi isik, siis peaks märgendused olema järgnevad:
+
+1. koha- või ajamäärus &rArr; vahel
+3. isik või organisatsioon &rArr; mitte kunagi
 
 
 
-Iga lausegrupi põhjal tuleb määrata, kas tegu on kohamääruse/ajamääruse/isiku või organisatsiooniga iga/mõne/mitte ühegi lause puhul. See näitab, mis on fraasi sagedus vastava määrusena antud lausetes.
-
-Kui lausegrupis on nt 3 lauset ja iga lause puhul on fraas kohamäärus, siis tuleb märgendada järgenvalt:
-1. kohamäärus -> alati
-2. ajamäärus -> mitte kunagi
-3. isik või organisatsioon -> mitte kunagi
-
-Kui aga kasvõi ühes lauses on fraas ajamäärus ja ülejäänutes kohamäärus, siis märgendused peaks olema järgnevad:
-1. kohamäärus -> vahel
-2. ajamäärus -> vahel
-3. isik või organisatsioon -> mitte kunagi
-
-
-
-I. Kohamäärus
+## III. Mis on kohamäärus
 
 Kohamäärus väljendab tegevuse kohta ja vastab küsimusele:
+
 - kus?
 - kust?
 - kuhu?
@@ -71,6 +86,7 @@ Kohamäärus väljendab tegevuse kohta ja vastab küsimusele:
 Kohamääruseks võib lauses olla nimisõna, mis sisaldab lokaalseid tähenduskomponente (mets, meri, tuba, maja, kosmos, ida) või kohamäärsõna (vasakul, sinna).
 
 Nimisõna võib olla:
+
 - kohakäänetes: Lapsed võtsid *kapist* salaja küpsiseid. Ta istus *diivanil*
 - rajavas käändes: Plaanime reisida *Põhja-Itaaliani*
 või tähistada:
@@ -82,7 +98,7 @@ või tähistada:
 
 
 
-II. Ajamäärus
+## IV. Mis on ajamäärus
 
 Ajamäärus väljendab sündmuse toimumisaega, kestust, korduvust jms.
 
@@ -91,55 +107,59 @@ Toimumisaega võivad väljendada nt sõnad üleeile, päeval, õhtul, pärast ha
 Samuti on ajamäärus ajapiiri näitav ning vastab küsimusele 'mis ajast alates'. Nt kella kahest, alates eelmisest reedest, eilseni, kuni lõunani.
 
 Kestust näitav määrus vastab küsimustele:
+
 - kui kaua?
 - kui pika ajaga?
 - kui pika aja vältel?
 - kui kauaks?
-Nt:
-Ma pole teda *ammu* näinud.
-Seisin järjekorras *üle poole tunni*.
-*Etenduse ajaks* tuleb telefon hääletuks panna.
-*Arvuti käivitamisel* kostus krigin.
+
+Näiteks:
+
+- Ma pole teda *ammu* näinud.
+- Seisin järjekorras *üle poole tunni*.
+- *Etenduse ajaks* tuleb telefon hääletuks panna.
+- *Arvuti käivitamisel* kostus krigin.
 
 Korduvust näitavad nt sõnad korra, mitu korda, sageli, üle päeva, iga hetk, uuesti.
 
 
-
-III. Isik või organisatsioon
-
-Üldjuhul vastab isik või organisatsioon tegijana küsimustele kes? ja mis?
-
-Isiku alla kuuluvad inimeste nimed (Jüri, Mari) ning sõnad, mis viitavad inimesele nt ema/isa/ametnik/laulja/tema/mina.
-
-Organisatsiooni alla kuuluvad samuti nimed (Tartu Ülikool, Pimedate ühing) ning asutustele, ettevõtetele, ühingutele jms viitavad sõnad nt kool/selts/firma/organisatsioon.
-
-Samuti kuuluvad siia kategooriasse elusolendid (sh loomad).
-
-
-IV. Sündmus
+## V. Mis on sündmus
 
 Kui lauses esinevat fraasi võib tõlgendada nii koha kui ajana, siis on tegu sündmusega.
 
-Nt:
-Vaidlesin *koosolekul*.
-Me tulime *trennist*.
+Näiteks:
+
+- Vaidlesin *koosolekul*.
+- Me tulime *trennist*.
 
 Juhul kui fraas viitab sündmusele, siis tuleks seda märgendada nii koha- kui ajamääruseks.
 
 
 
-V. Muu
+## VI. Mis on isik või organisatsioon
 
-Juhul kui fraas ei kuulu mitte ühtegi kolmest kategooriast või on raske määrata, siis võib seda märgendada kui "muu" või "pole kindel". Nendest juhtudest võib ka eraldi teada anda.
+Üldjuhul vastab isik või organisatsioon tegijana küsimustele kes? ja mis? aga vahel on need ka teises rollis. Näiteks 
+- Ma rääkisin *sulle* oma suurima saladuse.
+- Ta sai *Jürilt* kooskülastuse.
+- Ma kahtlesin *Eesti Kommunistlikus Parteis*.
+ 
+Isiku alla kuuluvad inimeste nimed (Jüri, Mari) ning sõnad, mis viitavad inimesele nt ema/isa/ametnik/laulja/tema/mina.
 
-Jan-Erik tegi oma esimesed sammud isa Jaanus Nõgisto *jälgedes* just teles - TV 3 saates “ Bingo Loto ” .
-jälgedes -> muu
+Organisatsiooni alla kuuluvad samuti nimed (Tartu Ülikool, Pimedate ühing) ning asutustele, ettevõtetele, ühingutele jms viitavad sõnad nt kool/selts/firma/organisatsioon. Samuti kuuluvad siia kategooriasse elusolendid (sh loomad).
 
-*Kvartaliaruannetes* tuleb tihti üllatusi .
-Kvartaliaruannetes pole koht => muu
+
+
+## VII. Mis läheb muu alla
+
+Juhul kui fraas ei kuulu mitte ühtegi elnevalt defineeritud neljast kategooriast või on raske määrata, siis võib seda märgendada kui "muu" või "pole kindel". Nendest juhtudest võib ka eraldi teada anda.
+
+- Jan-Erik tegi oma esimesed sammud isa Jaanus Nõgisto *jälgedes* just teles - TV 3 saates “ Bingo Loto ” .
+jälgedes &rArr;  muu
+- *Kvartaliaruannetes* tuleb tihti üllatusi &rArr; muu, sest kvartaliaruannetes pole koht.
 
 
 Samuti on siin kategoorias fraasid ja sõnad nagu:
+
 - eredaimalt tõusis esile
 - teiselt poolt/mõõtmetelt/rohkuselt/stiililt/saavutustelt tõusevad esile
 - madalatel pööretel
@@ -159,20 +179,23 @@ Samuti on siin kategoorias fraasid ja sõnad nagu:
 
 
 Ka sõnad, mis ei ole käändes, aga millel on juhtumisi vastav käändelõpp:
+
 - kääne all (kellele/millele); lauses sõna *üleeile*
 - kääne el (kellest/millest); lauses "*jäätist* tahaks"
 
 
 Vale sõna on märgendatud obl-iks:
+
 "Need liiguvad Lioni näolt laual asetsevatele *mustadele*, elusuurusest justkui isegi suurematele ametitelefonidele ja telefonidelt jälle tagasi Lioni näole."
--> korrektne oleks märkida *ametitelefonidele* obl-iks
+&rArr;  korrektne oleks märkida *ametitelefonidele* obl-iks
 
 
 **Küsitavad:**
-Ta on ema *sisendamisel* täielikult hälbinud.
-See vaikus kestab *teost* kuulanus edasi sisemise rahuna.
-kõigist *keeldudest* hoolimata kestab edasi
-kestab edasi *põlvest* põlve
-... kestis see *inertsist*  päris kaua edasi.
-*sellest* hoolimata kestab edasi
-ketrab *villast* lõnga - ketrab millest lõnga/ ketrab millist lõnga?
+
+- Ta on ema *sisendamisel* täielikult hälbinud.
+- See vaikus kestab *teost* kuulanus edasi sisemise rahuna.
+- kõigist *keeldudest* hoolimata kestab edasi
+- kestab edasi *põlvest* põlve
+- ... kestis see *inertsist*  päris kaua edasi.
+- *sellest* hoolimata kestab edasi
+- ketrab *villast* lõnga - ketrab millest lõnga/ ketrab millist lõnga?
