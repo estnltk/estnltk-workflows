@@ -25,11 +25,11 @@ valinud kümme näitelauset, mille põhjal saab valikut teha. Selles on erinevat
 
 > **rääkima - in (kelles/milles)**
 > 
-> Tagatipuks <span style="background-color:rgba(122, 193, 48, 0.3)">rääkige</span> mulle suurtest pragudest <span style="background-color:rgba(234, 86, 100, 0.3)">oma korteri magamistoa</span> <span style="background-color:rgba(7, 149, 226, 0.3)">seinas</span>. 
+> Tagatipuks <span style="background-color:rgba(122, 193, 48, 0.3)">*rääkige*</span> mulle suurtest pragudest <span style="background-color:rgba(234, 86, 100, 0.3)">**oma korteri magamistoa**</span> <span style="background-color:rgba(7, 149, 226, 0.3)">***seinas***</span>. 
 >
-> <span style="background-color:rgba(122, 193, 48, 0.3)">Rääkis</span> kord tuttav vormsilane <span style="background-color:rgba(7, 149, 226, 0.3)">kodukeskkonnas</span></span> pisikese viskiklaasi kõrvale järgmise loo.
+> <span style="background-color:rgba(122, 193, 48, 0.3)">*Rääkis*</span> kord tuttav vormsilane <span style="background-color:rgba(7, 149, 226, 0.3)">***kodukeskkonnas***</span></span> pisikese viskiklaasi kõrvale järgmise loo.
 > 
-> Hispaania keelt <span style="background-color:rgba(122, 193, 48, 0.3)">räägib</span> <span style="background-color:rgba(7, 149, 226, 0.3)">Californias</span></span> emakeelena rohkem inimesi kui inglise keelt. 
+> Hispaania keelt <span style="background-color:rgba(122, 193, 48, 0.3)">*räägib*</span> <span style="background-color:rgba(7, 149, 226, 0.3)">***Californias***</span></span> emakeelena rohkem inimesi kui inglise keelt. 
 
 
 
@@ -47,9 +47,10 @@ Lisaks eelnevale on olemas ka valik `muu`, mille abil saab anda edasi muud oluli
 
 Kuna koha- ja ajamääruste definitsioon on hägune, siis loeme sündmused ka koha või ajamääruseks.
 
-> Ma osalesin <span style="background-color:rgba(7, 149, 226, 0.3)">Tartu kevadlaadal</span>.
+> Ma osalesin <span style="background-color:rgba(7, 149, 226, 0.3)">*Tartu kevadlaadal*</span>.
 > 
-> Ma läksin <span style="background-color:rgba(7, 149, 226, 0.3)">Peetri sünnipäevale</span>.
+> Ma läksin <span style="background-color:rgba(7, 149, 226, 0.3)">*Peetri sünnipäevale*</span>.
+
 
 Seda eelkõige sellepärast, et need täpsustavad tegevuse toimumise kohta ja aega ning sageli pole võimalik määrata kumba neist täpselt. Näiteks `Tartu kevadlaat` toimub Tartus ja ka kevadel ning see kas see määrab ära aja või koha sõltub kontekstist.
 
@@ -89,7 +90,9 @@ Nimisõna võib olla:
 
 - kohakäänetes: Lapsed võtsid *kapist* salaja küpsiseid. Ta istus *diivanil*
 - rajavas käändes: Plaanime reisida *Põhja-Itaaliani*
+  
 või tähistada:
+
 - ruumi, kohta, suunda: *Õues* on täna jahe
 - elusolendit, kollektiivi, keha või vaimu komponenti: *Temas* on midagi nukrameelset. *Südamest* käis valusähvakas läbi. Olen kümme aastat musitseerinud *rahvamuusikaansamblis*
 - abstraktmõistet: *Vangistuses* peitub tõeline agoonia
@@ -192,10 +195,9 @@ Vale sõna on märgendatud obl-iks:
 
 **Küsitavad:**
 
-- Ta on ema *sisendamisel* täielikult hälbinud.
-- See vaikus kestab *teost* kuulanus edasi sisemise rahuna.
+- See vaikus kestab *teost* kuulanus edasi sisemise rahuna
 - kõigist *keeldudest* hoolimata kestab edasi
-- kestab edasi *põlvest* põlve
-- ... kestis see *inertsist*  päris kaua edasi.
-- *sellest* hoolimata kestab edasi
+- kestab edasi *põlvest* põlve - pole mõeldud põlve kui kehaosa
+- kestis see *inertsist*  päris kaua edasi.
+- *sellest* hoolimata kestab edasi - kui pole selge, millele viitab 'sellest'
 - ketrab *villast* lõnga - ketrab millest lõnga/ ketrab millist lõnga?
