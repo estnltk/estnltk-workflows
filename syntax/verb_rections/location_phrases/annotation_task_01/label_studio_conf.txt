@@ -24,6 +24,7 @@
 <Header value="Kas tegu on millegi muuga?"/>
 <Choices name="muu" toName="text">
     <Choice value="muu"/>
-  <Choice value="pole kindel"/>
+    <Choice value="pole kindel"/>
+    <Choice value="vaieldav märgendus"/>
 </Choices>
 </View>
