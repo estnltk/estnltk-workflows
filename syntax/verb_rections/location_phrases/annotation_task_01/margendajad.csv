@@ -1,6 +1,7 @@
-märgendaja,andmestik,,
-Annaliis,abl_set1,in_set1,ad_set2
-Kertu,ad_set1,all_set2,el_set2???
-Jekaterina,all_set1,adit_set1,el_set1
-Valeria ,ill_set1,,
-Agnes,ill_set1???,,
+märgendaja,andmestik,,,
+Annaliis,*abl_set1,*in_set1,*ad_set2,all_set3
+Kertu,*ad_set1,all_set2,el_set2,
+Jekaterina,*all_set1,*adit_set1,*el_set1,
+Valeria ,ill_set1,,,
+Agnes,,,,
+Marianna,,,,
