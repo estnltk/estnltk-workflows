@@ -171,9 +171,11 @@ if __name__ == '__main__':
 
             startTime = datetime.now()
             if not dry_run:
-                if tagger.output_layer not in collection.layers and (block is not None or mode == 'append'):
+                if tagger.output_layer not in collection.layers:
                     log.info( f" Initializing collection's layer" )
                     collection.add_layer( tagger.get_layer_template() )
+                elif block is not None:
+                    mode = 'append'
 
             def timexes_row_mapper(row):
                 text_id, text = row[0], row[1]
@@ -218,7 +220,8 @@ if __name__ == '__main__':
                 # Create layer
                 collection.create_layer(layer_template=layer_template, 
                                         data_iterator=data_iterator,
-                                        row_mapper=row_mapper)
+                                        row_mapper=row_mapper, 
+                                        mode=mode)
             else:
                 # Debug creating layer
                 log.info(' [dry_run mode]: just make query and tag layers, but do not save into database.')
