@@ -1,4 +1,9 @@
-# Robust document creation time detection for Koondkorpus' documents. 
+#
+#  Robust document creation time detection for Koondkorpus' documents. 
+#  Document creation times are needed by TimexTagger for correctly 
+#  resolving relative time expressions, such as 'eile' ('yesterday') 
+#  or 'eelmisel aastal' ('last year').
+#
 import re
 import json
 import os, os.path
