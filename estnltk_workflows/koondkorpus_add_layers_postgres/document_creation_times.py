@@ -33,7 +33,7 @@ class KoondkorpusDCTFinder:
     '''
 
     def __init__( self, extracted_dcts_file='extracted_dcts.tsv'):
-        '''Initializes ReferenceTimeFinder.'''
+        '''Initializes KoondkorpusDCTFinder.'''
         self.file_to_dct = {}
         if isinstance(extracted_dcts_file, str):
             if os.path.exists(extracted_dcts_file):

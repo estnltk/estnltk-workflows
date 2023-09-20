@@ -35,6 +35,8 @@ For tagging a layer, you need the following configurations:
 
 * `02_add_stanza_syntax_layer.py` -- adds stanza syntax layer. Note that depending on the model used, this tagger requires that input morph\_extended or morph\_analysis layers already exist in the database. If you do not want to save morph\_extended layer to the database, use the script `02_add_composite_stanza_syntax_layer.py` instead.
 
+* `02_add_timexes_layer.py` -- adds timexes layer with EstNLTK's TimexTagger. Note that this script uses Koondkorpus-specific logic for finding document creation times required for normalization of relative dates (for details, see the module `document_creation_times.py`).
+
 Note: all scripts create detached layers.
 
 ### Data parallelization
