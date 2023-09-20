@@ -170,11 +170,9 @@ if __name__ == '__main__':
                 log.info(' Preparing to tag {!r} all of {} documents...'.format(tagger.output_layer, total_docs) )
 
             startTime = datetime.now()
-            if not dry_run:
-                if tagger.output_layer not in collection.layers:
-                    log.info( f" Initializing collection's layer" )
-                    collection.add_layer( tagger.get_layer_template() )
-                elif block is not None:
+
+            if tagger.output_layer in collection.layers:
+                if block is not None:
                     mode = 'append'
 
             def timexes_row_mapper(row):
