@@ -1,5 +1,11 @@
 # EstNLTK PstgreSQL collections
 
+---
+
+⚠️ These are legacy workflows, no longer supported.
+
+---
+
 The demo workflows here are related to EstNLTK PostgreSQL collecions.
 
 There are three main steps:
