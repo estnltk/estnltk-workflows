@@ -1,4 +1,4 @@
-# Workflows for converting etTenTen 2013 to JSON files and annotating with EstNLTK
+# Workflow for converting etTenTen 2013 to JSON files and annotating with EstNLTK
 
 ---
 
@@ -6,7 +6,7 @@
 
 ---
 
-This folder contains command line workflows for processing the etTenTen 2013 corpus with EstNLTK and saving into JSON format files.
+This folder contains command line workflow for processing the etTenTen 2013 corpus with EstNLTK and saving into JSON format files.
 You can use these scripts if you need a basic pipeline for processing large corpora and adding linguistic analyses. 
 If you need a pipeline tailored for your purposes, you can also follow the example of these scripts while implementing your own pipeline.
 
