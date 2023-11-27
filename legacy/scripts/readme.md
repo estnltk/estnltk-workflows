@@ -1,5 +1,11 @@
 # Create collection
 
+---
+
+⚠️ This is legacy code, no longer supported.
+
+---
+
 Assume that there is a table that contains at least a unique id column and either a column of plain texts or a column
 of `Text` objects in EstNltk 1.6 json format.
 
