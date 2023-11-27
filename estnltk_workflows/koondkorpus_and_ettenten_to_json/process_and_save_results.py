@@ -1,13 +1,13 @@
 #
-#   Analyses JSON format data, adding layers of analyses up to the level 
-#   of morphological analysis (incl).
-#   Saves results as EstNLTK 1.6.x JSON export files (recommended), or 
+#   Analyses JSON format data, adding layers of analyses up to the 
+#   level of morphological analysis (incl).
+#   Saves results as EstNLTK JSON export files (recommended), or 
 #   as pickle Text objects.
 #   This script is for processing large corpora -- Koondkorpus and 
 #   etTenTen -- with EstNLTK.
 #
-#   Developed and tested under Python's version:  3.5.4
-#                              EstNLTK version:   1.6.1_beta
+#   Requires Python's version:  3.8
+#            EstNLTK version:   1.7.2
 #
 
 import os, os.path
@@ -19,8 +19,8 @@ from datetime import timedelta
 
 from estnltk import Text
 from estnltk.taggers import SentenceTokenizer
-from estnltk.taggers.morph_analysis.gt_morf import GTMorphConverter
-from estnltk.taggers.syntax_preprocessing.syntax_ignore_tagger import SyntaxIgnoreTagger
+from estnltk.taggers import GTMorphConverter
+from estnltk.taggers.standard.syntax.preprocessing.syntax_ignore_tagger import SyntaxIgnoreTagger
 
 from estnltk.converters import text_to_json, json_to_text
 
@@ -71,7 +71,7 @@ def load_in_file_names( fnm ):
 if __name__ == '__main__':
     # =======  Parse input arguments
     arg_parser = argparse.ArgumentParser(description=\
-    '''  Analyses JSON format text data with EstNLTK 1.6.x, adding layers of 
+    '''  Analyses JSON format text data with EstNLTK, adding layers of 
          analyses up to the level of morphological analysis (incl).
          Saves results as EstNLTK JSON export files (recommended), or 
          as pickle Text objects.
@@ -189,11 +189,11 @@ if __name__ == '__main__':
                     print(processed,'->',ofnm_json)
 
                 # 2) Add morphological analysis
-                text.tag_layer(['morph_analysis'])
+                text.tag_layer('morph_analysis')
 
                 # 3) Add clauses
                 if add_clauses:
-                    text.tag_layer(['clauses'])
+                    text.tag_layer('clauses')
 
                 # 4) Convert morph analyses to GT format 
                 if add_gt_morph_analysis:
