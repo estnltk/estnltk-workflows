@@ -2,7 +2,7 @@
 
 ---
 
-⚠️ Thes is a legacy workflow, no longer supported.
+⚠️ This is a legacy workflow, no longer supported.
 
 ---
 
@@ -12,7 +12,7 @@ If you need a pipeline tailored for your purposes, you can also follow the examp
 
 ## Workflow for processing the etTenTen corpus (2013)
 
-For processing the etTenTen corpus (aka _Eesti veeb 2013_, _Veebikorpus13_, _Estonian Web 2013_, or _etWaC 2013_) with EstNLTK 1.6.x, please proceed in the following steps:
+For processing the etTenTen corpus (aka _Eesti veeb 2013_, _Veebikorpus13_, _Estonian Web 2013_, or _etWaC 2013_) with EstNLTK, please proceed in the following steps:
 
 **1.** Download and unpack the corpus, e.g. from here: [https://metashare.ut.ee/repository/browse/ettenten-korpus-toortekst/b564ca760de111e6a6e4005056b4002419cacec839ad4b7a93c3f7c45a97c55f](https://metashare.ut.ee/repository/browse/ettenten-korpus-toortekst/b564ca760de111e6a6e4005056b4002419cacec839ad4b7a93c3f7c45a97c55f) (or [https://doi.org/10.15155/1-00-0000-0000-0000-0011fl](https://doi.org/10.15155/1-00-0000-0000-0000-0011fl) )
 
@@ -22,7 +22,7 @@ You should get a large file with the extension _vert_ or _prevert_ (e.g. `ettent
 
 **3.** (_Optional_) Use **`split_large_corpus_files_into_subsets.py`** for splitting the large set of files from the previous step into N smaller subsets. This will enable parallel processing of the subsets.
 
-**4.** Use the script **`process_and_save_results.py`** to analyze the JSON format files with EstNLTK 1.6.x. The script will add linguistic annotations up to the level of _morphology_. Before using the script, you'll also need to create a new folder where the script can store the results of analysis. 
+**4.** Use the script **`process_and_save_results.py`** to analyze the JSON format files with EstNLTK. The script will add linguistic annotations up to the level of _morphology_. Before using the script, you'll also need to create a new folder where the script can store the results of analysis. 
 
    Optionally, you may want to evoke N instances of **`process_and_save_results.py`** for faster processing. You can get more information about the processing options with:
 
