@@ -4,7 +4,7 @@ This folder contains command line workflows for adding EstNLTK's annotation laye
 
 ### Requirements
 
-* [**Psycopg 2**](http://initd.org/psycopg) (installation: `pip install psycopg2-binary`)
+* [**Psycopg 2**](https://www.psycopg.org) (installation: `pip install psycopg2-binary`)
 * estnltk (v1.7.2+)
 * estnltk_neural (v1.7.2+)
 
