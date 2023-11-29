@@ -3,8 +3,7 @@
 #   level of morphological analysis (incl).
 #   Saves results as EstNLTK JSON export files (recommended), or 
 #   as pickle Text objects.
-#   This script is for processing large corpora -- Koondkorpus and 
-#   etTenTen -- with EstNLTK.
+#   This script is for processing Koondkorpus with EstNLTK.
 #
 #   Requires Python's version:  3.8
 #            EstNLTK version:   1.7.2
@@ -34,7 +33,7 @@ add_syntax_ignore     = True   # add layer 'syntax_ignore'
 add_gt_morph_analysis = True   # add layer 'gt_morph_analysis'
 
 input_ext     = '.json'     # extension of input files
-corpus_type   = 'ettenten'  # 'koond' or 'ettenten'
+corpus_type   = 'koond'     # 'koond' or 'ettenten' (discarded)
 output_format = 'json'      # 'json' or 'pickle'
 
 skip_list     = []          # files to be skipped (for debugging purposes)
@@ -75,8 +74,7 @@ if __name__ == '__main__':
          analyses up to the level of morphological analysis (incl).
          Saves results as EstNLTK JSON export files (recommended), or 
          as pickle Text objects.
-         This script is for processing large corpora -- Koondkorpus and 
-         etTenTen -- with EstNLTK.
+         This script is for processing Koondkorpus with EstNLTK.
     ''')
     arg_parser.add_argument('in_dir', default = None, \
                                       help='the directory containing input files; '+\
@@ -96,12 +94,6 @@ if __name__ == '__main__':
                                         help='the output directory where the results '+\
                                              'of analysis (one output file per each input file) '+\
                                              'will be written.')
-    arg_parser.add_argument('--koond', default = False,
-                                        help='If set, then expects that the input files come '+\
-                                             'from Koondkorpus (and applies Koondkorpus-specific meta-'+\
-                                             'data acquisition methods). Otherwise, assumes that input '+\
-                                             'files come from etTenTen.',\
-                                             action='store_true')
     arg_parser.add_argument('--pickle', default = False,
                                         help='If set, then changes the output format from json (which is '+\
                                              'default) to pickle. Note that pickle files take up more space '+\
@@ -116,7 +108,6 @@ if __name__ == '__main__':
     if args.in_files and not os.path.isfile(args.in_files):
         print(' Unable to load input from',in_files,'...' )
     output_format = 'pickle' if args.pickle==True else 'json'
-    corpus_type   = 'koond' if args.koond==True else 'ettenten'
 
     if out_dir and in_dir:
         assert corpus_type and corpus_type.lower() in ['koond', 'ettenten']

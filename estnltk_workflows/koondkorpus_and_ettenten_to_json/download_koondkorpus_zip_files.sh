@@ -5,7 +5,6 @@ wget http://www.cl.ut.ee/korpused/segakorpus/arvutitehnika/failid/Arvutitehnika.
 wget http://www.cl.ut.ee/korpused/segakorpus/doktoritood/failid/Doktoritood.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/eestiarst/failid/EestiArst.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/ekspress/failid/Ekspress.zip
-wget http://www.cl.ut.ee/korpused/segakorpus/uusmeedia/failid/xml/foorum_uudisgrupp_kommentaar.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/horisont/failid/Horisont.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/eesti_ilukirjandus_1990/failid/Ilukirjandus.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/kroonika/failid/Kroonika.zip
@@ -19,3 +18,6 @@ wget http://www.cl.ut.ee/korpused/segakorpus/seadused/failid/xml/Seadused.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/slohtuleht/failid/xml/SLOleht.tar.gz
 wget http://www.cl.ut.ee/korpused/segakorpus/teadusartiklid/failid/Teadusartiklid.zip
 wget http://www.cl.ut.ee/korpused/segakorpus/valgamaalane/failid/Valgamaalane.zip
+wget http://www.cl.ut.ee/korpused/segakorpus/uusmeedia/failid/xml/foorum_uudisgrupp_kommentaar.zip
+#  Note: jututoad (chat room corpus) is a bit exceptional, it diverges largely from the standard written language
+wget http://www.cl.ut.ee/korpused/segakorpus/uusmeedia/failid/xml/jututoad_xml.zip
