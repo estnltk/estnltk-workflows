@@ -1,6 +1,6 @@
 # Workflow: importing Estonian Reference Corpus into a PostgreSQL database
 
-This folder contains a command line workflow for loading the _Estonian Reference Corpus_ (_Eesti keele koondkorpus_) with EstNLTK and saving into a PostgreSQL database. 
+This folder contains a command line workflow for loading the _Estonian Reference Corpus_ (_Eesti keele koondkorpus_) with EstNLTK and saving into a [PostgreSQL](https://www.postgresql.org) database. 
 
 _Note_: for using the workflow, you need [**Psycopg 2**](https://www.psycopg.org) package that allows to communicate with PostgreSQL database. Install it with command:
 
@@ -56,10 +56,19 @@ Note that the script works with both zipped and unzipped files. For detailed hel
 
 For detailed help about the command, run: `python store_koondkorpus_in_pgcollection.py -h`
 
+Example usage:
+
+	python store_koondkorpus_in_pgcollection.py  --pgpass pgpass.txt  --schema estonian_text_corpora  --role estonian_text_corpora_read  -i zipped   -t preserve  --collection koondkorpus_base_v2  --metadata_extent complete
+
+
 ## Helpful utilities
 
 There are also some additional scripts that may be helpful for managing large PostgreSQL collections.
 
- * **`build_pgcollection_index.py`** -- Builds word count index from a corpus in given Postgres collection. The index shows character and word counts (and optionally sentence counts and some text metadata) for each document in the corpus. For detailed usage information, run: `python build_pgcollection_index.py -h`
+ * **`build_pgcollection_index.py`** -- Builds word count index from a corpus in given Postgres collection. The index shows character and word counts (and optionally sentence counts and some text metadata) for each document in the corpus. For detailed usage information, run: `python build_pgcollection_index.py -h`. Example usage:
 
- * **`select_randomly_from_index.py`** -- Selects a random subset of documents from a word count index, preserving the proportional distribution of documents with respect to a target category. For more info, run: `python select_randomly_from_index.py -h`
+	    python build_pgcollection_index.py  koondkorpus_base_v2  v166_words  --pgpass pgpass.txt  --schema estonian_text_corpora  --role estonian_text_corpora_read  --sentences_layer v166_sentences
+
+ * **`select_randomly_from_index.py`** -- Selects a random subset of documents from a word count index, preserving the proportional distribution of documents with respect to a target category. For more info, run: `python select_randomly_from_index.py -h`. Example usage:
+
+	    python select_randomly_from_index.py  koondkorpus_index.txt  subcorpus  1000000  --seed 1
