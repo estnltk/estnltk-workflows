@@ -4,6 +4,8 @@
 #  tokenization to Texts (optional), splits Texts into paragraphs or sentences (optional), 
 #  and stores Texts in a PostgreSQL collection.
 # 
+#   Requirements:   py3.8+,  EstNLTK 1.7
+#
 
 import os, sys
 import os.path
@@ -19,7 +21,7 @@ from collections import OrderedDict
 from datetime import datetime
 from datetime import timedelta
 
-from estnltk.layer_operations import split_by
+from estnltk_core.layer_operations import split_by
 
 from estnltk.corpus_processing.parse_koondkorpus import get_div_target
 from estnltk.corpus_processing.parse_koondkorpus import get_text_subcorpus_name
@@ -208,7 +210,7 @@ def iter_packed_xml(root_dir, focus_input_files=None, encoding='utf-8', \
 
 #
 # The following iterator functions borrow from Paul's source at:
-#      .../estnltk_workflows/postgres_collections/data_import/create_collection.py
+#      https://github.com/estnltk/estnltk-workflows/blob/333c1ac8ac1b0a95fcb8767bd83f0d039d046bec/estnltk_workflows/postgres_collections/data_import/create_collection.py
 #
 
 # function that keeps the original text without splitting
@@ -333,10 +335,6 @@ def process_files(rootdir, doc_iterator, collection, focus_input_files=None,\
             focus_input_files, thus overrides the skipping directed by
             the later set.
     """
-    
-    global special_tokens_tagger
-    global special_compound_tokens_tagger
-    global special_sentence_tokenizer
     assert doc_iterator in [iter_unpacked_xml, iter_packed_xml]
     assert tokenization in [None, 'none', 'preserve', 'estnltk']
     assert splittype in ['no_splitting', 'sentences', 'paragraphs']
@@ -673,11 +671,11 @@ if __name__ == '__main__':
                              "(default: none)",\
                         choices=['none', 'preserve', 'estnltk'], \
                         default='none' )
-    parser.add_argument('-p', '--layer_prefix', dest='original_layer_prefix', default = '', \
+    parser.add_argument('-p', '--layer_prefix', dest='original_layer_prefix', default = 'original_', \
                         help='specifies prefix (string) that will be added to names of layers that \n'+\
                              'contain original tokenization from the XML files. The prefix is only\n'+\
                              'added to layer names iff flag --tokenization preserve is used.\n'+\
-                             '(default: "")\n')
+                             '(default: "original_")\n')
     parser.add_argument('--splittype', dest='splittype', action='store',
                         default='no_splitting', choices=['no_splitting', 'sentences', 'paragraphs'],
                         help='specifies if and how the source texts should be split before\n'+
@@ -786,14 +784,14 @@ if __name__ == '__main__':
     storage = PostgresStorage(pgpass_file=args.pgpass,
                               schema=args.schema,
                               role=args.role)
-    collection = storage.get_collection(args.collection, meta_fields=meta_fields)
+    collection = storage[args.collection]
     if collection.exists():
         if args.mode is None:
              log.error(' (!) Collection {!r} already exists, use --mode {{overwrite,append}}.'.format(args.collection))
              exit(1)
         if args.mode == 'overwrite':
              log.info(' Collection {!r} exists. Overwriting.'.format(args.collection))
-             collection.delete()
+             storage.delete_collection(args.collection)
         elif args.mode == 'append':
              # A small sanity check before appending: existing meta fields of the table 
              # should match with newly specified meta fields
@@ -810,13 +808,13 @@ if __name__ == '__main__':
              log.info('Collection {!r} exists. Appending.'.format(args.collection))
 
     if not collection.exists():
-         collection = storage.get_collection(args.collection, meta_fields=meta_fields)
-         tokenization_desc = ''
+         collection_desc = ''
          if args.tokenization == 'preserve':
-             tokenization_desc = ' with original segmentation'
+             collection_desc = ' with original segmentation'
          elif args.tokenization == 'estnltk':
-             tokenization_desc = ' with segmentation'
-         collection.create('collection of estnltk texts'+tokenization_desc)
+             collection_desc = ' with estnltk segmentation'
+         collection_desc = 'Collection of Koondkorpus texts'+collection_desc
+         storage.add_collection(args.collection, description=collection_desc, meta=meta_fields)
          log.info(' New collection {!r} created.'.format(args.collection))
     
     docs_already_in_db = None

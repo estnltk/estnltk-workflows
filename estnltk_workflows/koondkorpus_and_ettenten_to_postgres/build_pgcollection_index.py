@@ -8,7 +8,7 @@
 #  selection from the corpus, and later it can be used as 
 #  a guide in processing the corpus. 
 # 
-#   Requirements:   py3.6+,  EstNLTK 1.6.7
+#   Requirements:   py3.8+,  EstNLTK 1.7.2+
 #
 
 import re
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     try:
 
-        collection = storage.get_collection( args.collection )
+        collection = storage[ args.collection ]
         if not collection.exists():
             log.error(' (!) Collection {!r} does not exist...'.format(args.collection))
             exit(1)

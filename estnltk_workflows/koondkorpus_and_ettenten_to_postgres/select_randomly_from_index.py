@@ -3,8 +3,6 @@
 #  index, preserving the proportional distribution of documents 
 #  with respect to a target category.
 #
-#   Requirements:   py3.6+,  EstNLTK 1.6.7
-#
 
 import os, os.path
 import argparse

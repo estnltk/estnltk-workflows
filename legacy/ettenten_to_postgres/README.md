@@ -8,7 +8,7 @@
 
 This folder contains command line workflow for loading the _etTenTen corpus_ with EstNLTK and saving into a PostgreSQL database. 
 
-_Note_: for using the workflow, you need [**Psycopg 2**](http://initd.org/psycopg) package that allows to communicate with PostgreSQL database. Installation:
+_Note_: for using the workflow, you need [**Psycopg 2**](https://www.psycopg.org) package that allows to communicate with PostgreSQL database. Installation:
 
 	pip install psycopg2-binary
 
