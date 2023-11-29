@@ -17,6 +17,10 @@ For tagging a layer, you need the following configurations:
 
 ### Scripts
 
+* `00_split_into_sentences.py` -- splits texts of a Koondkorpus' PostgreSQL collection into sentences and saves into a new collection. Automatically adds segmentation and morphological analysi layers up to `"morph_extended"` to each sentence.    This script assumes data parallelization: you can launch multiple instances of the script and give each instance a (non-overlapping) sub set of the source collection for processing. Use command line parameters `module remainder` to process only texts for which holds `text_id % module == remainder`. Example usage:
+
+	`python  00_split_into_sentences.py  confs\conf_koondkorpus_00_split_into_sentences.ini  1  0`
+
 * `01_add_base_layer.py` -- depending on the input configuration, adds either a segmentation layer (`"tokens"`, `"compound_tokens"`,  `"words"`, `"sentences"`, `"paragraphs"`) or a morphological analysis layer (`"morph_analysis"` or `"morph_extended"`). Example usages:
 
 	`python  01_add_base_layer.py  pgpass.txt  confs/conf_koondkorpus_01_add_tokens.ini`
