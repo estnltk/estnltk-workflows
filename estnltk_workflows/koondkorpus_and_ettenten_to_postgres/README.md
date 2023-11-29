@@ -67,7 +67,11 @@ There are also some additional scripts that may be helpful for managing large Po
 
  * **`build_pgcollection_index.py`** -- Builds word count index from a corpus in given Postgres collection. The index shows character and word counts (and optionally sentence counts and some text metadata) for each document in the corpus. For detailed usage information, run: `python build_pgcollection_index.py -h`. Example usage:
 
-	    python build_pgcollection_index.py  koondkorpus_base_v2  v166_words  --pgpass pgpass.txt  --schema estonian_text_corpora  --role estonian_text_corpora_read  --sentences_layer v166_sentences
+	    python build_pgcollection_index.py  --pgpass pgpass.txt  --schema estonian_text_corpora  --role estonian_text_corpora_read  --sentences_layer v166_sentences  koondkorpus_base_v2  v166_words
+
+ * **`build_pgcollection_metadata_index.py`** -- Builds JSON metadata index from a corpus in Postgres collection. The index records JSON metadata (text.meta) of each document in the collection and, optionally, also records the text length and  text's start snippet of each document. For detailed usage information, run: `python build_pgcollection_metadata_index.py -h`. Example usage:
+
+	    python build_pgcollection_metadata_index.py  --pgpass pgpass.txt  --schema estonian_text_corpora  --role estonian_text_corpora_read  --snippet_size 100  koondkorpus_base_v2
 
  * **`select_randomly_from_index.py`** -- Selects a random subset of documents from a word count index, preserving the proportional distribution of documents with respect to a target category. For more info, run: `python select_randomly_from_index.py -h`. Example usage:
 
