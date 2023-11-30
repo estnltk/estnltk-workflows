@@ -4,9 +4,9 @@ This folder contains workflows for processing the [Estonian Reference Corpus](ht
 
 ## Corpus import
 
-* [create_json](create_json) -- workflow for importing the corpus from XML files, processing with EstNLTK and saving into JSON format files;
+* [import_to_json](import_to_json) -- workflow for importing the corpus from XML files, processing with EstNLTK and saving into JSON format files;
 
-* [create_postgres](create_postgres) -- workflow for importing the corpus from XML files, processing with EstNLTK and saving into a [PostgreSQL](https://www.postgresql.org) database; 
+* [import_to_postgres](import_to_postgres) -- workflow for importing the corpus from XML files, processing with EstNLTK and saving into a [PostgreSQL](https://www.postgresql.org) database; 
 
 ## Annotation
 
