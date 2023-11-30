@@ -10,4 +10,4 @@ This folder contains workflows for processing the [Estonian Reference Corpus]((h
 
 ## Annotation
 
-* [postgres_add_layers](postgres_add_layers) -- workflows for adding EstNLTK's annotation layers to koondkorpus collections in a PostgreSQL DB. Also includes wordflows for: a) splitting koondkorpus documents into sentences and saving into a separate collection, b) automatically detecting creation times of koondkorpus documents;
+* [postgres_add_layers](postgres_add_layers) -- workflows for adding EstNLTK's annotation layers to koondkorpus collections in a PostgreSQL DB. Also includes workflows for: a) splitting koondkorpus documents into sentences and saving into a separate collection, b) automatically detecting creation times of koondkorpus documents;
