@@ -4,13 +4,13 @@
 #  (along with appropriate collection metadata) as a separate Text object 
 #  into a new collection. 
 #
-#  This script assumes data parallelization: you can launch multiple instances 
+#  This script supports data parallelization: you can launch multiple instances 
 #  of the script and give each instance a (non-overlapping) sub set of data for 
-#  processing. Use command line parameters `module remainder` to process only 
+#  processing. Use command line parameters `module,remainder` to process only 
 #  texts for which holds `text_id % module == remainder`. 
 #  For instance: 
 #
-#      python 00_split_into_sentences.py  confs\..split_into_sentences.ini   2  0
+#      python 00_split_into_sentences.py  confs\..split_into_sentences.ini   2,0
 #      ... processes texts 0, 2, 4, 6, 8, ...
 #  
 #  This code is based on Kaire's script "1_collection_splitting.py". 
@@ -18,6 +18,7 @@
 #     https://github.com/estnltk/syntax_experiments/blob/59190d83e79b780890150ab7d515c2d72dc8a9e6/collection_splitting/1_collection_splitting.py
 #
 
+import re
 import argparse
 import os, os.path
 import configparser
@@ -37,24 +38,32 @@ parser = argparse.ArgumentParser(description=
     "'morph_extended' layer to each sentence, and saves each sentence "+
     '(along with appropriate collection metadata) as a separate Text object '+
     'into a new collection. '+
-    'This script assumes data parallelization: you can launch multiple instances '+
+    'This script supports data parallelization: you can launch multiple instances '+
     'of the script and give each instance a (non-overlapping) sub set of the source '+
-    'collection for processing. Use command line parameters `module remainder` '+
+    'collection for processing. Use command line parameters `module,remainder` '+
     r'to process only texts for which holds `text_id % module == remainder`. ')
 parser.add_argument("file", help="Configuration INI file name. Specifies parameters of the source and target collection.", 
                     type=str)
-parser.add_argument("module",
-                    type=int,
-                    help="Data parallelization: select texts with `text_id %% module == remainder` for processing.")
-parser.add_argument("remainder", 
-                    type=int, 
-                    help="Data parallelization: select texts with `text_id %% module == remainder` for processing.")
+parser.add_argument("module_and_reminder", 
+                    nargs='?', type=str, default='1,0', 
+                    help="Comma separated integer values of module and remainder, e.g. `1,0`, `2,1`, `4,2`. "+
+                         "These values are used to control data parallelization: only texts with "+
+                         "`text_id %% module == remainder` will be selected for processing. "+
+                         "(default: '1,0')")
 parser.add_argument('--text_id', dest='text_id_name', action='store', type=str, default='text_no',\
                     help="name of the `text_id` metadata field in the target collection. "+
                          "(default: 'text_no')" )
 args = parser.parse_args()
-module = args.module
-remainder = args.remainder
+module_and_reminder = args.module_and_reminder
+m = re.match('(\d+)[,:;](\d+)', module_and_reminder)
+if m:
+    module = int(m.group(1))
+    assert module > 0
+    remainder = int(m.group(2))
+    assert remainder < module
+else:
+    module = 1
+    remainder = 0
 text_id_name = args.text_id_name
 
 # Read configuration
