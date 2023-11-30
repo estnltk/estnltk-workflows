@@ -1,6 +1,6 @@
 # Workflows for processing Estonian Reference Corpus
 
-This folder contains workflows for processing the [Estonian Reference Corpus]((http://www.cl.ut.ee/korpused/segakorpus/)) (_Eesti keele koondkorpus_) with EstNLTK. 
+This folder contains workflows for processing the [Estonian Reference Corpus](http://www.cl.ut.ee/korpused/segakorpus/) (_Eesti keele koondkorpus_) with EstNLTK. 
 
 ## Corpus import
 
