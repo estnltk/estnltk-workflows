@@ -13,7 +13,7 @@ parser.add_argument('--attributes', dest='attributes', action='store', nargs='*'
 args = parser.parse_args()
 
 
-from estnltk.storage import PostgresStorage
+from estnltk.storage.postgres import PostgresStorage
 from estnltk import logger
 
 logger.setLevel(args.logging)

@@ -1,5 +1,5 @@
 from estnltk import logger
-from estnltk.storage import PostgresStorage
+from estnltk.storage.postgres import PostgresStorage
 
 
 def tag_collection(tagger, args):
