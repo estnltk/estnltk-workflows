@@ -5,6 +5,7 @@
 #  * The subset is constrained by the number of words in the whole selection, 
 #    and, optionally, by minimum/maximum amount of words that each document 
 #    must have. 
+#  The result is a file with selected document indexes.
 #
 
 import os, os.path
@@ -101,13 +102,13 @@ if __name__ == '__main__':
                              '(default: None).')
     parser.add_argument('--seed', dest='random_seed_value', action='store', type=int, default=1,\
                         help="random seed value used in making the random selection (default: 1).")
-    parser.add_argument('-o', '--out_index_file', dest='out_index_file', action='store', type=str, default='random_selection_index.txt',\
+    parser.add_argument('-o', '--out_index_file', dest='out_index_file', action='store', type=str, default='random_selection_v2_index.txt',\
                         help="name of the output file where randomly selected document indexes will be written. "+\
-                             "(default: 'random_selection_index.txt')" )
+                             "(default: 'random_selection_v2_index.txt')" )
     parser.add_argument('--out_word_count_file', dest='out_word_count_file', action='store', type=str, \
-                                            default='random_selection_word_count_index.txt', \
+                                            default='random_selection_v2_word_count_index.txt', \
                         help="name of the output file where word count index of the random selection will be written. "+\
-                             "(default: 'random_selection_word_count_index.txt')" )
+                             "(default: 'random_selection_v2_word_count_index.txt')" )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
