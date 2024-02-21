@@ -73,6 +73,10 @@ There are also some additional scripts that may be helpful for managing large Po
 
 	    python build_pgcollection_metadata_index.py  --pgpass pgpass.txt  --schema estonian_text_corpora  --role estonian_text_corpora_read  --snippet_size 100  koondkorpus_base_v2
 
- * **`select_randomly_from_index.py`** -- Selects a random subset of documents from a word count index, preserving the proportional distribution of documents with respect to a target category. For more info, run: `python select_randomly_from_index.py -h`. Example usage:
+* **`select_randomly_from_index.py`** -- Selects a random subset of documents from a word count index. The subset is constrained by the number of documents, and, optionally, by minimum/maximum amount of words each document must have.  For more info, run: `python select_randomly_from_index.py -h`. Example usage:
 
-	    python select_randomly_from_index.py  koondkorpus_index.txt  subcorpus  1000000  --seed 1
+	    python select_randomly_from_index.py  koondkorpus_index.txt  subcorpus  100000  --seed 1  --words_min  15  --words_max  10000
+
+ * **`select_randomly_from_index_2.py`** -- Selects a random subset of documents from a word count index (version 2). The subset preserves the proportional distribution of documents with respect to a target category (e.g. `subcorpus`). The subset is constrained by the number of words in the whole selection, and, optionally, by minimum/maximum amount of words that each document    must have. For more info, run: `python select_randomly_from_index_2.py -h`. Example usage:
+
+	    python select_randomly_from_index_2.py  koondkorpus_index.txt  subcorpus  1000000  --seed 1
