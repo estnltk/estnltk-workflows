@@ -36,8 +36,6 @@ maximum_text_size = 5000000
 # Only morph_analysis layer will be checked
 max_layer_size = 175000000
 
-input_vert_files = []
-
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
     if os.path.isfile(input_fname):
@@ -64,6 +62,11 @@ if len(sys.argv) > 1:
                     break
             focus_doc_ids = configuration['focus_doc_ids']
             collection_directory = configuration['collection']
+            logger = None
+            if configuration['log_json_conversion']:
+                from x_logging import init_logger
+                log_fname = f'json_conv_{collection_directory}'
+                logger = init_logger( log_fname, configuration['json_conversion_log_level'], focus_block )
             global_meta_collector = MetaFieldsCollector() # collect meta over all vert files
             sentence_hash_retagger = \
                 SentenceHashRetagger() if configuration['add_sentence_hashes'] else None
@@ -77,7 +80,8 @@ if len(sys.argv) > 1:
                                                                            restore_morph_analysis=True, 
                                                                            extended_morph_form=True,
                                                                            add_document_index=True,
-                                                                           original_layer_prefix='' ):
+                                                                           original_layer_prefix='',
+                                                                           logger=logger):
                     assert text_obj.layers == {'words', 'tokens', 'paragraphs', 'morph_analysis', 
                                                'compound_tokens', 'word_chunks', 'sentences'}
                     assert [key in text_obj.meta for key in ['_doc_id', '_doc_start_line', '_doc_end_line']]
@@ -86,6 +90,12 @@ if len(sys.argv) > 1:
                     text_obj.pop_layer('tokens')
                     text_obj.pop_layer('word_chunks')
                     text_obj.pop_layer('paragraphs')
+                    # Rename 'morph_analysis' -> 'morph_analysis_ext' to avoid confusion
+                    # ( StanzaSyntaxTagger has some hard-coded checks that will raise an 
+                    #  alarm if input_type 'morph_extended' goes with layer named 'morph_analysis' )
+                    morph_analysis = text_obj.pop_layer('morph_analysis')
+                    morph_analysis.name = 'morph_analysis_ext'
+                    text_obj.add_layer(morph_analysis)
                     # Document id inside the vert file (not to be mistaken with 'id' in <doc> tag) 
                     doc_file_id = text_obj.meta['_doc_id']
                     # Collect document metadata
@@ -109,7 +119,7 @@ if len(sys.argv) > 1:
                     # Determine output path and write document into output file:
                     json_file_path = get_doc_file_path(collection_directory, input_vert_fname, int(doc_file_id))
                     save_text_obj_as_json_file(text_obj, json_file_path, max_text_size=maximum_text_size, batch_splitting_layer='sentences', 
-                                                                         max_layer_size=max_layer_size, size_validation_layer='morph_analysis' )
+                                                                         max_layer_size=max_layer_size, size_validation_layer='morph_analysis_ext' )
                     # Post-check:
                     # 1) validate that the document json file was created
                     # 2) check whether the document was split or not
