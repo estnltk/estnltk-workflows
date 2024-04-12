@@ -5,6 +5,7 @@
 import re
 import os, os.path
 import configparser
+import logging
 
 def parse_configuration( conf_file:str ):
     '''Parses ENC processing configuration parameters from the given INI file.'''
@@ -36,6 +37,9 @@ def parse_configuration( conf_file:str ):
                 for vert_file in vert_files:
                     if not os.path.exists( vert_file ):
                         raise ValueError(f'Error in {conf_file}: missing file {vert_file!r} listed in "vert_files".')
+            # Logging parameters
+            log_json_conversion = config[section].getboolean('log_json_conversion', False)
+            json_conversion_log_level = logging.getLevelName( config[section].get('json_conversion_log_level', 'INFO') )
             # Flag parameters
             add_sentence_hashes = config[section].getboolean('add_sentence_hashes', False)
             collect_meta_fields = config[section].getboolean('collect_meta_fields', True)
@@ -53,6 +57,8 @@ def parse_configuration( conf_file:str ):
             clean_conf['add_sentence_hashes'] = add_sentence_hashes
             clean_conf['collect_meta_fields'] = collect_meta_fields
             clean_conf['focus_doc_ids'] = focus_doc_ids
+            clean_conf['log_json_conversion'] = log_json_conversion
+            clean_conf['json_conversion_log_level'] = json_conversion_log_level
             return clean_conf
     if not section_found:
         print(f'No section starting with "collection" in {conf_file}.')

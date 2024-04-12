@@ -42,7 +42,7 @@ def get_doc_file_path(collection_dir:str, vert_fname:str, doc_id:int, max_files:
        `int(doc_id / max_files)`. 
        
        If create_path is True (default), then all the missing sub-directories 
-       on the path are also computed. 
+       on the path are also created. 
     '''
     assert max_files > 0, f'(!) max_files must be a positive value'
     # Strip path and extension from the .vert file name
