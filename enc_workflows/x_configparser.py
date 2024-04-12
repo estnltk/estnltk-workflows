@@ -15,10 +15,11 @@ def parse_configuration( conf_file:str ):
         raise FileNotFoundError("Config file {} does not exist".format(conf_file))
     if len(config.read(conf_file)) != 1:
         raise ValueError("File {} is not accessible or is not in valid INI format".format(conf_file))
-    section_found = False
+    clean_conf = {}
+    collection_info_found = False
     for section in config.sections():
         if section.startswith('collection'):
-            section_found = True
+            collection_info_found = True
             # Load collection's configuration from the section
             if not config.has_option(section, 'name'):
                 raise ValueError(f'Error in {conf_file}: section {section!r} is missing "name" parameter.')
@@ -51,7 +52,6 @@ def parse_configuration( conf_file:str ):
                     raise ValueError(f'Error in {conf_file}: section {section} parameter "focus_doc_ids" should be string.')
                 focus_doc_ids = [f.strip() for f in re.split('[;,]', focus_doc_ids_raw) if len(f.strip()) > 0]
                 focus_doc_ids = set(focus_doc_ids)
-            clean_conf = {}
             clean_conf['collection'] = collection_name
             clean_conf['vert_files'] = vert_files
             clean_conf['add_sentence_hashes'] = add_sentence_hashes
@@ -59,7 +59,20 @@ def parse_configuration( conf_file:str ):
             clean_conf['focus_doc_ids'] = focus_doc_ids
             clean_conf['log_json_conversion'] = log_json_conversion
             clean_conf['json_conversion_log_level'] = json_conversion_log_level
-            return clean_conf
-    if not section_found:
-        print(f'No section starting with "collection" in {conf_file}.')
+        if section.startswith('syntax_layer'):
+            # Load collection's syntax annotation configuration from the section
+            if not config.has_option(section, 'name'):
+                raise ValueError(f'Error in {conf_file}: section {section!r} is missing "name" parameter.')
+            syntax_layer_name = str(config[section]['name'])
+            if not syntax_layer_name.isidentifier():
+                raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {syntax_layer_name!r} for parameter "name". '+
+                                  'Expected a legitimate identifier.')
+            clean_conf['syntax_layer_name'] = syntax_layer_name
+            clean_conf['use_gpu'] = config[section].getboolean('use_gpu', False)
+            clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
+    if 'collection' in clean_conf.keys():
+        # Return collected configuration
+        return clean_conf
+    if not collection_info_found:
+        print(f'No section starting with "collection" in {conf_file}. Unable to collect collection information.')
     return None
