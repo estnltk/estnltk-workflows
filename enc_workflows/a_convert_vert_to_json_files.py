@@ -49,6 +49,7 @@ if len(sys.argv) > 1:
             split_docs = 0
             converted_docs = 0
             focus_block = None
+            too_long_sentences = 0
             # Get divisor & reminder for data parallelization
             for sys_arg in sys.argv[2:]:
                 m = re.match('(\d+)[,:;](\d+)', sys_arg)
@@ -93,9 +94,10 @@ if len(sys.argv) > 1:
                     # Rename 'morph_analysis' -> 'morph_analysis_ext' to avoid confusion
                     # ( StanzaSyntaxTagger has some hard-coded checks that will raise an 
                     #  alarm if input_type 'morph_extended' goes with layer named 'morph_analysis' )
-                    morph_analysis = text_obj.pop_layer('morph_analysis')
-                    morph_analysis.name = 'morph_analysis_ext'
-                    text_obj.add_layer(morph_analysis)
+                    if configuration.get('rename_morph_layer', None) is not None:
+                        morph_analysis = text_obj.pop_layer('morph_analysis')
+                        morph_analysis.name = configuration['rename_morph_layer']
+                        text_obj.add_layer(morph_analysis)
                     # Document id inside the vert file (not to be mistaken with 'id' in <doc> tag) 
                     doc_file_id = text_obj.meta['_doc_id']
                     # Collect document metadata
@@ -113,6 +115,7 @@ if len(sys.argv) > 1:
                         warnings.warn(f"Document {doc_file_id} contains sentence(s) exceeding maximum sentence length {maximum_sentence_length}:" )
                         for bs_id, bs in enumerate(bad_sentences):
                             warnings.warn(f"{bad_sentence_ids[bs_id]}: {bs[:100]!r}...{bs[-100:]!r}" )
+                            too_long_sentences += 1
                     # Calculate sentence fingerprints
                     if sentence_hash_retagger is not None:
                         sentence_hash_retagger.retag( text_obj )
@@ -142,6 +145,9 @@ if len(sys.argv) > 1:
                 print(f' =={collection_directory}==')
                 print(f' Converted documents:  {converted_docs}')
                 print(f'     split documents:  {split_docs}')
+                if too_long_sentences > 0:
+                    print()
+                    print(f'(!) too long sentences:  {too_long_sentences}')
         else:
             print(f'Missing or bad configuration in {input_fname!r}. Unable to get configuration parameters.')
 else:

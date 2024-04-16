@@ -114,7 +114,6 @@ def collect_collection_subdirs(collection_dir:str,
     all_document_subdirs = True
     if only_first_level:
         # Collect only first level subdirectories
-        subdirs = []
         for fname in os.listdir(collection_dir):
             fpath = os.path.join(collection_dir, fname)
             if os.path.isdir(fpath):

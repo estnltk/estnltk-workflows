@@ -55,17 +55,16 @@ if len(sys.argv) > 1:
             focus_doc_ids = configuration['focus_doc_ids']
             collection_directory = configuration['collection']
             logger = None  # TODO
-            syntax_layer_name = configuration.get('syntax_layer_name', None)
+            syntax_layer_name = configuration.get('output_syntax_layer', None)
             remove_old_document = False   # TODO
             if syntax_layer_name is None:
                 raise Exception('(!) Input configuration {} does not list syntax_layer_name. '.format(input_fname) +\
                                 'Probably missing section "syntax_layer" with option "name".')
             add_layer_creation_time = configuration.get('add_layer_creation_time', False)
             # Initialize tagger
-            # TODO: make more configurable
-            input_morph_layer = 'morph_analysis_ext'
-            input_words_layer = 'words'
-            input_sentences_layer = "sentences"
+            input_morph_layer = configuration['input_morph_layer']
+            input_words_layer = configuration['input_words_layer']
+            input_sentences_layer = configuration['input_sentences_layer']
             syntax_parser = StanzaSyntaxTagger( input_type='morph_extended', \
                                                 words_layer=input_words_layer, \
                                                 sentences_layer=input_sentences_layer, \
@@ -74,6 +73,8 @@ if len(sys.argv) > 1:
                                                 use_gpu=configuration.get('use_gpu', False) )
             # Iterate over all vert subdirs and all document subdirs within these subdirs
             vert_subdirs = collect_collection_subdirs(configuration['collection'], only_first_level=True, full_paths=False)
+            if len(vert_subdirs) == 0:
+                warnings.warn(f'(!) No document subdirectories found from collection dir {configuration["collection"]!r}')
             for vert_subdir in vert_subdirs:
                 full_subdir = os.path.join(configuration['collection'], vert_subdir)
                 print(f'Processing {vert_subdir} ...')
