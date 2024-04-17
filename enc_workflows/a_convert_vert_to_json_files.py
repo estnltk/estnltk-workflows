@@ -12,6 +12,8 @@ import re, sys
 import os, os.path
 from collections import defaultdict
 
+from datetime import datetime
+
 import warnings
 
 from estnltk import Text
@@ -61,8 +63,9 @@ if len(sys.argv) > 1:
                     focus_block = (divisor, remainder)
                     print(f'Data parallelization: focus on block {focus_block}.')
                     break
-            focus_doc_ids = configuration['focus_doc_ids']
             collection_directory = configuration['collection']
+            focus_doc_ids = configuration['focus_doc_ids']
+            total_start_time = datetime.now()
             logger = None
             if configuration['log_json_conversion']:
                 from x_logging import init_logger
@@ -148,6 +151,7 @@ if len(sys.argv) > 1:
                 if too_long_sentences > 0:
                     print()
                     print(f'(!) too long sentences:  {too_long_sentences}')
+                print(f'  Total time elapsed:  {datetime.now()-total_start_time}')
         else:
             print(f'Missing or bad configuration in {input_fname!r}. Unable to get configuration parameters.')
 else:

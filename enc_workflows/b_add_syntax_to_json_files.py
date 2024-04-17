@@ -57,7 +57,6 @@ if len(sys.argv) > 1:
                     print(f'Data parallelization: focus on block {focus_block}.')
                     break
             # Get collection's parameters
-            focus_doc_ids = configuration['focus_doc_ids']
             collection_directory = configuration['collection']
             # Get layer annotation parameters
             total_start_time = datetime.now()
@@ -71,7 +70,7 @@ if len(sys.argv) > 1:
             # Get output_mode
             # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
             # OVERWRITE -- overwrites the old json file with new content;
-            # Applies both to NEW_FILE and OVERWRITE:
+            # Applies to both NEW_FILE and OVERWRITE:
             # if `output_remove_morph` is set, then removes the input morph layer from the output document;
             #
             output_mode         = configuration['output_mode']

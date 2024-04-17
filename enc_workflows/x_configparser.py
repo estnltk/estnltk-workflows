@@ -88,7 +88,7 @@ def parse_configuration( conf_file:str ):
             # output_mode
             # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
             # OVERWRITE -- overwrites the old json file with new content;
-            # Applies both to NEW_FILE and OVERWRITE:
+            # Applies to both NEW_FILE and OVERWRITE:
             # if `output_remove_morph` is set, then removes the input morph layer from the output document;
             #
             clean_conf['output_mode'] = config[section].get('output_mode', 'NEW_FILE')
