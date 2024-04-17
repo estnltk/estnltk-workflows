@@ -9,6 +9,8 @@ import re, sys
 import os, os.path
 import hashlib
 
+from datetime import datetime, timedelta
+
 from estnltk import Text, Layer, Annotation
 from estnltk.taggers import Retagger
 from estnltk_core import EnvelopingSpan
@@ -332,6 +334,23 @@ def save_text_obj_as_json_file( text: Text, output_dir:str, max_text_size:int=10
         outfpath = os.path.join(output_dir, outfname)
         # Output file
         text_to_json(text_chunk, file=outfpath)
+
+# ======================================================================
+#  Processing speed calculation
+# ======================================================================
+
+def find_processing_speed( time_delta:timedelta, word_count:int, return_formatted:bool=True ):
+    '''Calculates and returns raw processing speed (words per second).'''
+    assert isinstance(time_delta, timedelta)
+    assert isinstance(word_count, int) and word_count > 0
+    total_sec = time_delta.total_seconds()
+    if total_sec > 0:
+        words_per_second = word_count / total_sec
+    else:
+        words_per_second = None
+    if return_formatted and words_per_second is not None:
+        return '{:.0f}'.format(words_per_second)
+    return words_per_second
 
 
 # ======================================================================

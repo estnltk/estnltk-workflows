@@ -25,6 +25,7 @@ from estnltk_neural.taggers import StanzaSyntaxTagger
 from x_utils import collect_collection_subdirs
 from x_utils import convert_original_morph_to_stanza_input_morph
 from x_utils import construct_db_syntax_layer
+from x_utils import find_processing_speed
 
 from x_configparser import parse_configuration
 
@@ -71,7 +72,7 @@ if len(sys.argv) > 1:
             # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
             # OVERWRITE -- overwrites the old json file with new content;
             # Applies both to NEW_FILE and OVERWRITE:
-            # if 'output_remove_morph' is set, then removes the input morph layer from the output document;
+            # if `output_remove_morph` is set, then removes the input morph layer from the output document;
             #
             output_mode         = configuration['output_mode']
             output_file_infix   = configuration['output_file_infix']
@@ -143,6 +144,10 @@ if len(sys.argv) > 1:
                                                                         words_layer=input_words_layer, 
                                                                         add_parent_and_children=True)
                             text_obj.add_layer( db_syntax_layer )
+                            if add_layer_creation_time:
+                                # Add layer creation timestamp
+                                db_syntax_layer.meta['created_at'] = \
+                                    (datetime.now()).strftime('%Y-%m-%d')
                             # Remove the temporary syntax layer
                             text_obj.pop_layer( syntax_parser.output_layer )
                             # Remove the input morph layer
@@ -150,7 +155,7 @@ if len(sys.argv) > 1:
                                 text_obj.pop_layer( input_morph_layer )
                             # Records statistics
                             annotated_words += len( text_obj[db_syntax_layer.name] )
-                            annotated_sentences += len( input_sentences_layer )
+                            annotated_sentences += len( text_obj[input_sentences_layer] )
                             # Finally, save the results
                             if output_mode == 'NEW_FILE':
                                 fpath_fname, fpath_ext = os.path.splitext( fpath )
@@ -176,6 +181,10 @@ if len(sys.argv) > 1:
                 print(f'     Annotated words:  {annotated_words}')
                 print()
                 print(f'  Total time elapsed:  {datetime.now()-total_start_time}')
+                if annotated_words > 0:
+                    speed_str = find_processing_speed(datetime.now()-total_start_time, annotated_words)
+                    with_gpu_str = '(with GPU)' if syntax_parser.use_gpu else ''
+                    print(f'    Processing speed:  ~{speed_str} words/sec {with_gpu_str}')
             else:
                 warnings.warn(f'(!) No document JSON files found from subdirectories of the collection dir {configuration["collection"]!r}')
         else:
