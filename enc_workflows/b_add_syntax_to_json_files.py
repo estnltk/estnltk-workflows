@@ -39,7 +39,10 @@ if len(sys.argv) > 1:
             raise Exception('(!) Input file {!r} with unexpected extension, expected a configuration INI file.'.format(input_fname))
         if configuration is not None:
             annotated_docs = 0
+            annotated_words = 0
+            annotated_sentences = 0
             annotated_split_docs = 0
+            skipped_annotated_docs = 0 # documents that were already annotated
             focus_block = None
             # Get divisor & reminder for data parallelization
             for sys_arg in sys.argv[2:]:
@@ -52,15 +55,28 @@ if len(sys.argv) > 1:
                     focus_block = (divisor, remainder)
                     print(f'Data parallelization: focus on block {focus_block}.')
                     break
+            # Get collection's parameters
             focus_doc_ids = configuration['focus_doc_ids']
             collection_directory = configuration['collection']
-            logger = None  # TODO
+            # Get layer annotation parameters
+            total_start_time = datetime.now()
             syntax_layer_name = configuration.get('output_syntax_layer', None)
-            remove_old_document = False   # TODO
             if syntax_layer_name is None:
                 raise Exception('(!) Input configuration {} does not list syntax_layer_name. '.format(input_fname) +\
-                                'Probably missing section "syntax_layer" with option "name".')
+                                'Probably missing section "add_syntax_layer" with option "name".')
+            skip_annotated = configuration.get('skip_annotated', True)
             add_layer_creation_time = configuration.get('add_layer_creation_time', False)
+            #
+            # Get output_mode
+            # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
+            # OVERWRITE -- overwrites the old json file with new content;
+            # Applies both to NEW_FILE and OVERWRITE:
+            # if 'output_remove_morph' is set, then removes the input morph layer from the output document;
+            #
+            output_mode         = configuration['output_mode']
+            output_file_infix   = configuration['output_file_infix']
+            output_remove_morph = configuration['output_remove_morph']
+            logger = None  # TODO
             # Initialize tagger
             input_morph_layer = configuration['input_morph_layer']
             input_words_layer = configuration['input_words_layer']
@@ -76,6 +92,7 @@ if len(sys.argv) > 1:
             if len(vert_subdirs) == 0:
                 warnings.warn(f'(!) No document subdirectories found from collection dir {configuration["collection"]!r}')
             for vert_subdir in vert_subdirs:
+                subdir_start_time = datetime.now()
                 full_subdir = os.path.join(configuration['collection'], vert_subdir)
                 print(f'Processing {vert_subdir} ...')
                 # Fetch all the document subdirs
@@ -89,8 +106,9 @@ if len(sys.argv) > 1:
                     # Collect document json files
                     found_doc_files = []
                     for fname in os.listdir(doc_subdir):
-                        if '_syntax' in fname:
+                        if output_file_infix in fname:
                             # Skip already annotated documents
+                            skipped_annotated_docs += 1
                             continue
                         if fname.startswith('doc') and fname.endswith('.json'):
                             found_doc_files.append(fname)
@@ -98,9 +116,14 @@ if len(sys.argv) > 1:
                         warnings.warn( f'(!) No document json files found from {doc_subdir!r}' )
                     else:
                         # Process json files
+                        local_annotated_docs = 0
                         for fname in found_doc_files:
                             fpath = os.path.join(doc_subdir, fname)
                             text_obj = json_to_text(file = fpath)
+                            if skip_annotated and syntax_layer_name in text_obj.layers:
+                                # Skip document (already annotated)
+                                skipped_annotated_docs += 1
+                                continue
                             if input_morph_layer not in text_obj.layers:
                                 raise Exception(f'(!) Input json document {fpath!r} is missing {input_morph_layer!r} layer. '+\
                                                 f'Available layers: {text_obj.layers!r}.')
@@ -120,30 +143,41 @@ if len(sys.argv) > 1:
                                                                         words_layer=input_words_layer, 
                                                                         add_parent_and_children=True)
                             text_obj.add_layer( db_syntax_layer )
-                            # Remove other layers
+                            # Remove the temporary syntax layer
                             text_obj.pop_layer( syntax_parser.output_layer )
-                            text_obj.pop_layer( input_morph_layer )
+                            # Remove the input morph layer
+                            if output_remove_morph:
+                                text_obj.pop_layer( input_morph_layer )
+                            # Records statistics
+                            annotated_words += len( text_obj[db_syntax_layer.name] )
+                            annotated_sentences += len( input_sentences_layer )
                             # Finally, save the results
-                            if not remove_old_document:
+                            if output_mode == 'NEW_FILE':
                                 fpath_fname, fpath_ext = os.path.splitext( fpath )
-                                new_fpath = f'{fpath_fname}_syntax{fpath_ext}'
+                                new_fpath = f'{fpath_fname}{output_file_infix}{fpath_ext}'
+                                assert new_fpath != fpath
                                 text_to_json( text_obj, file=new_fpath )
                             else:
                                 text_to_json( text_obj, file=fpath )
-                            #
-                            # TODO: measure processing time in previous steps
-                            #
-                        annotated_docs += 1
-                        if len(found_doc_files) > 1:
-                            annotated_split_docs += 1
-            if annotated_docs > 0:
-                #
-                # TODO: report processing times
-                #
+                            local_annotated_docs += 1
+                        annotated_docs += 1 if local_annotated_docs > 0 else 0
+                        if local_annotated_docs > 1:
+                            annotated_split_docs += local_annotated_docs
+                subdir_start_time = datetime.now()
+                print(f'Processing {vert_subdir} took {datetime.now()-subdir_start_time}.')
+            if annotated_docs > 0 or skipped_annotated_docs > 0:
                 print()
                 print(f' =={collection_directory}==')
+                if skipped_annotated_docs > 0:
+                    print(f'   Skipped documents:  {skipped_annotated_docs} (already annotated)')
                 print(f' Annotated documents:  {annotated_docs}')
                 print(f'    incl. split docs:  {annotated_split_docs}')
+                print(f' Annotated sentences:  {annotated_sentences}')
+                print(f'     Annotated words:  {annotated_words}')
+                print()
+                print(f'  Total time elapsed:  {datetime.now()-total_start_time}')
+            else:
+                warnings.warn(f'(!) No document JSON files found from subdirectories of the collection dir {configuration["collection"]!r}')
         else:
             print(f'Missing or bad configuration in {input_fname!r}. Unable to get configuration parameters.')
 else:

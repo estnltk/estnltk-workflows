@@ -19,8 +19,10 @@ def parse_configuration( conf_file:str ):
     collection_info_found = False
     for section in config.sections():
         if section.startswith('collection'):
-            collection_info_found = True
+            #
             # Load collection's configuration from the section
+            #
+            collection_info_found = True
             if not config.has_option(section, 'name'):
                 raise ValueError(f'Error in {conf_file}: section {section!r} is missing "name" parameter.')
             collection_name = str(config[section]['name'])
@@ -65,8 +67,10 @@ def parse_configuration( conf_file:str ):
             clean_conf['log_json_conversion'] = log_json_conversion
             clean_conf['json_conversion_log_level'] = json_conversion_log_level
             clean_conf['rename_morph_layer'] = rename_morph_layer
-        if section.startswith('syntax_layer'):
-            # Load collection's syntax annotation configuration from the section
+        if section.startswith('add_syntax_layer'):
+            #
+            # Load configuration for adding the syntax layer to the collection
+            #
             if not config.has_option(section, 'name'):
                 raise ValueError(f'Error in {conf_file}: section {section!r} is missing "name" parameter.')
             # output layer name
@@ -80,7 +84,28 @@ def parse_configuration( conf_file:str ):
                 config[section].get('input_morph_layer', clean_conf.get('rename_morph_layer', 'morph_analysis_ext'))
             clean_conf['input_words_layer'] = config[section].get('input_words_layer', 'words')
             clean_conf['input_sentences_layer'] = config[section].get('input_sentences_layer', "sentences")
+            #
+            # output_mode
+            # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
+            # OVERWRITE -- overwrites the old json file with new content;
+            # Applies both to NEW_FILE and OVERWRITE:
+            # if 'output_remove_morph' is set, then removes the input morph layer from the output document;
+            #
+            clean_conf['output_mode'] = config[section].get('output_mode', 'NEW_FILE')
+            clean_conf['output_file_infix'] = config[section].get('output_file_infix', '_syntax')
+            clean_conf['output_remove_morph'] = config[section].getboolean('output_remove_morph', True)
+            if not isinstance(clean_conf['output_mode'], str) or not clean_conf['output_mode'].upper() in ['NEW_FILE', 'OVERWRITE']:
+                raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["output_mode"]!r} for '+\
+                                  'parameter "output_mode". Expected values: NEW_FILE or OVERWRITE.')
+            clean_conf['output_mode'] = clean_conf['output_mode'].upper()
+            if clean_conf['output_mode'] == 'NEW_FILE':
+                if (not isinstance(clean_conf['output_file_infix'], str) or \
+                    len(clean_conf['output_file_infix'].strip()) == 0):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["output_file_infix"]!r} for '+\
+                                      'parameter "output_file_infix". Expected a non-empty string.')
+            clean_conf['output_file_infix'] = clean_conf['output_file_infix'].strip()
             # parsing parameters
+            clean_conf['skip_annotated'] = config[section].getboolean('skip_annotated', True)
             clean_conf['use_gpu'] = config[section].getboolean('use_gpu', False)
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
     if 'collection' in clean_conf.keys():
