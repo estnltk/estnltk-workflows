@@ -17,20 +17,14 @@ from estnltk.corpus_processing.parse_enc import parse_tag_attributes
 class SimpleVertFileParser:
     """ A simple parser for document by document parsing of vert XML files. 
         
-        Document by document parsing (recommended):
         Use `vert_parser = SimpleVertFileParser(vert_file)` to create a new 
         document parser and call `next(vert_parser)` to retrieve the content and 
         metadata of the next document until all documents have been yielded. 
         If `vert_parser.parsing_finished == False`, then there are still documents 
-        left to be parsed. The generator yields tuples `(document_content_lines:list, 
-        document_metadata:dict)`. 
+        left to be parsed. 
         
-        Line by line parsing (advanced):
-        Each line of a vert file should be passed to the method `parse_next_line()`, 
-        which returns document content and metadata after a full document has been 
-        collected, or `None` if collecting document content is in progress. 
-        After the last line of the file has been parsed, method `finish_parsing()` 
-        needs to be called to get the content and metadata of the last document. 
+        The `vert_parser` is a generator, which yields tuples 
+        `(document_content_lines:list, document_metadata:dict)`. 
         
         This class is based on VertXMLFileParser from:
         https://github.com/estnltk/estnltk/blob/main/estnltk/estnltk/corpus_processing/parse_enc.py
@@ -74,13 +68,13 @@ class SimpleVertFileParser:
         '''
         with open( self.vert_file, mode='r', encoding='utf-8' ) as in_f:
             for line in in_f:
-                result = self.parse_next_line( line )
+                result = self._parse_next_line( line )
                 if result is not None:
                     # Return next document
                     yield result
         self.parsing_finished = True
         # Yield the last document
-        yield self.finish_parsing()
+        yield self._finish_parsing()
 
 
     def __next__(self):
@@ -90,7 +84,7 @@ class SimpleVertFileParser:
         return next(self._document_collector)
 
 
-    def parse_next_line( self, line: str ):
+    def _parse_next_line( self, line: str ):
         '''Parses a next line from the XML content of ENC vert file.
            
            Collects document content and metadata on the process. 
@@ -101,7 +95,7 @@ class SimpleVertFileParser:
            then returns None.
            
            In order to complete the last document, please call method 
-           finish_parsing() after parsing the last line of the vert 
+           _finish_parsing() after parsing the last line of the vert 
            file.
         '''
         stripped_line = line.strip()
@@ -234,7 +228,7 @@ class SimpleVertFileParser:
         return None
 
 
-    def finish_parsing( self ):
+    def _finish_parsing( self ):
         '''Finishes the vert file parsing and returns the last document lines and metadata. 
            Call this method after reaching to the end of the file. 
         '''
