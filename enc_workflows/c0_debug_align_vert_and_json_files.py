@@ -21,9 +21,12 @@ from estnltk.converters import text_to_json
 
 from x_utils import collect_collection_subdirs
 from x_utils import find_processing_speed
+from x_utils import get_sentence_hash
+from x_utils import create_sentences_hash_map
 
 from x_configparser import parse_configuration
 from x_vert_parser import SimpleVertFileParser
+from x_vert_parser import collect_sentence_tokens
 
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
@@ -96,15 +99,34 @@ if len(sys.argv) > 1:
                             
                             # Process json files and vert document content
                             id_inside_vert = 0
+                            last_vert_sent_start = 0
                             for text_obj in found_json_texts:
-                                
-                                # Align vert and json content word by word
-                                # TODO: add sentence-wise alignment 
+                                # Manage sentence-wise alignment 
                                 # (can be tricky due to empty sentences/wrong sentence tags)
+                                json_sentences_hash_map = \
+                                    create_sentences_hash_map(text_obj[input_sentences_layer])
+                                # Align vert and json content word by word
                                 for wid, word_token in enumerate(text_obj[input_words_layer]):
                                     vert_token = None
                                     while id_inside_vert < len(vert_document[0]):
                                         vert_token = vert_document[0][id_inside_vert]
+                                        if vert_token[0] == '<s>':
+                                            last_vert_sent_start = id_inside_vert
+                                            # Collect sentence tokens
+                                            vert_sent_tokens = \
+                                                collect_sentence_tokens(vert_document[0], id_inside_vert)
+                                            if len(vert_sent_tokens) > 0:
+                                                # Compute vert sentence hash
+                                                vert_hash = get_sentence_hash(vert_sent_tokens)
+                                                # Find matching json sentence(s)
+                                                json_sents = json_sentences_hash_map.get(vert_hash, [])
+                                                if json_sents:
+                                                    # Found matching sentence
+                                                    processed_sentences += 1
+                                                else:
+                                                    raise Exception(f'(!) Unable to find matching json sentence for '+\
+                                                                    f'the vert sentence {vert_sent_tokens!r} at the '+\
+                                                                    f'document with id={json_doc_id}.')
                                         if vert_token[0] == 'TOKEN':
                                             break
                                         # Skip non-tokens (tags etc.)
@@ -140,7 +162,6 @@ if len(sys.argv) > 1:
                                                         f'vert_doc_context:\n{vert_context}\n\n')
                                 
                                 # Records statistics
-                                processed_sentences += len( text_obj[input_sentences_layer] )
                                 processed_docs += 1
                                 subdir_id += 1
                                 progress_bar.update(1)

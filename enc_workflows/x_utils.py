@@ -357,7 +357,9 @@ def find_processing_speed( time_delta:timedelta, word_count:int, return_formatte
 #  Sentence fingerprint computation
 # ======================================================================
 
-def get_sentence_hash( sentence_span: Union[EnvelopingSpan, List[str]], hash_function ):
+default_hash_func = hashlib.new('sha256')
+
+def get_sentence_hash( sentence_span: Union[EnvelopingSpan, List[str]], hash_function=default_hash_func ):
     '''Calculates hash fingerprint of the given sentence with the given hash_function.'''
     if isinstance(sentence_span, EnvelopingSpan):
         sent_words = [w.text for w in sentence_span]
@@ -373,10 +375,9 @@ def get_sentence_hash( sentence_span: Union[EnvelopingSpan, List[str]], hash_fun
 
 
 # Smoke-test function get_sentence_hash()
-test_hash = hashlib.new('sha256')
-assert get_sentence_hash(["d", "e", "c", '1'], test_hash) == get_sentence_hash(["d", "e", "c", '1'], test_hash)
-assert get_sentence_hash(["a", "b", "c"], test_hash) == get_sentence_hash(["a", "b", "c"], test_hash)
-assert get_sentence_hash(['2', '1'], test_hash) == get_sentence_hash(['2', '1'], test_hash)
+assert get_sentence_hash(["d", "e", "c", '1'], default_hash_func) == get_sentence_hash(["d", "e", "c", '1'], default_hash_func)
+assert get_sentence_hash(["a", "b", "c"], default_hash_func) == get_sentence_hash(["a", "b", "c"], default_hash_func)
+assert get_sentence_hash(['2', '1'], default_hash_func) == get_sentence_hash(['2', '1'], default_hash_func)
 
 
 class SentenceHashRetagger(Retagger):
@@ -443,6 +444,25 @@ class SentenceHashRemover(Retagger):
             sentence.clear_annotations()
             for record in records:
                 sentence.add_annotation( Annotation(sentence, **record) )
+
+
+def create_sentences_hash_map( sentences_layer: Layer, hash_attrib:str='sha256' ):
+    '''For all sentences in the layer, creates a dictionary mapping from sentence 
+       hash fingerprint to corresponding sentence spans. 
+       Note the more than one sentence can be associated with one fingerprint, 
+       thus a fingerprint maps to a list of sentences.
+       This function requires that the sentences_layer has hash_attrib.
+    '''
+    assert hash_attrib in sentences_layer.attributes, \
+        f'(!) Unable to create sentence hash map: sentences layer is missing attribute {hash_attrib}.'
+    hash_map = {}
+    for sentence in sentences_layer:
+        sent_hash = sentence.annotations[0][hash_attrib]
+        assert isinstance(sent_hash, str)
+        if sent_hash not in hash_map.keys():
+            hash_map[sent_hash] = []
+        hash_map[sent_hash].append(sentence)
+    return hash_map
 
 
 # ======================================================================

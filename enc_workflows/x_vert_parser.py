@@ -6,13 +6,40 @@
 #
 #
 
-from typing import List, Union
+from typing import List, Union, Any
 
 import re, sys
 import os, os.path
 
 from estnltk import Text
 from estnltk.corpus_processing.parse_enc import parse_tag_attributes
+
+
+def collect_sentence_tokens(document_lines: List[Any], sentence_start:int):
+    '''Collects all tokens belonging to the sentence starting at the `sentence_start` 
+       in `document_lines`. Returns list of tokens (strings).
+       
+       `document_lines` should be a list of document content lines yielded by 
+       `SimpleVertFileParser`.
+    '''
+    sentence_tokens = []
+    if document_lines[sentence_start][0] != '<s>': # sanity check
+        raise IndexError(f'(!) document_line at {sentence_start} is not '+\
+                         f'sentence start <s>, but {document_lines[sentence_start]!r}.')
+    i = sentence_start
+    while i < len(document_lines):
+        line = document_lines[i]
+        line_type  = line[0]
+        line_token = line[1]
+        if line_type == 'TOKEN':
+            sentence_tokens.append(line_token)
+        elif line_type == '</s>':
+            # end this sentence
+            break
+        i += 1
+    return sentence_tokens
+
+
 
 class SimpleVertFileParser:
     """ A simple parser for document by document parsing of vert XML files. 
