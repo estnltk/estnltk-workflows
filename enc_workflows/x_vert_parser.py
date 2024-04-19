@@ -56,10 +56,10 @@ class SimpleVertFileParser:
         self.enc_glue_tag       = re.compile("^<g/>$")
         self.enc_unknown_tag    = re.compile("^<([^<>]+)>$")
         # Initialize a new generator
-        self._document_collector = self.document_collector()
+        self._document_collector_inst = self._document_collector()
 
 
-    def document_collector( self ):
+    def _document_collector( self ):
         '''Creates a generator function for collecting document content 
            lines and metadata from the vert file. 
            Upon iteration or calling next( vert_parser ), yields a 
@@ -81,7 +81,7 @@ class SimpleVertFileParser:
         '''Yields a tuple (document_content_lines, document_metadata) 
            until each document of the input vert file has been yielded. 
         '''
-        return next(self._document_collector)
+        return next(self._document_collector_inst)
 
 
     def _parse_next_line( self, line: str ):

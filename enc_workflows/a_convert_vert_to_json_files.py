@@ -117,7 +117,7 @@ if len(sys.argv) > 1:
                     if len(bad_sentences) > 0:
                         warnings.warn(f"Document {doc_file_id} contains sentence(s) exceeding maximum sentence length {maximum_sentence_length}:" )
                         for bs_id, bs in enumerate(bad_sentences):
-                            warnings.warn(f"{bad_sentence_ids[bs_id]}: {bs[:100]!r}...{bs[-100:]!r}" )
+                            warnings.warn(f"sent_id={bad_sentence_ids[bs_id]}, len={len(bs)}: {bs[:100]!r}...{bs[-100:]!r}" )
                             too_long_sentences += 1
                     # Calculate sentence fingerprints
                     if sentence_hash_retagger is not None:
