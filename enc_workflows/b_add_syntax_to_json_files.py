@@ -129,51 +129,54 @@ if len(sys.argv) > 1:
                         local_annotated_docs = 0
                         for fname in found_doc_files:
                             fpath = os.path.join(doc_subdir, fname)
-                            text_obj = json_to_text(file = fpath)
-                            if skip_annotated and syntax_layer_name in text_obj.layers:
-                                # Skip document (already annotated)
-                                skipped_annotated_docs += 1
-                                continue
-                            if input_morph_layer not in text_obj.layers:
-                                raise Exception(f'(!) Input json document {fpath!r} is missing {input_morph_layer!r} layer. '+\
-                                                f'Available layers: {text_obj.layers!r}.')
-                            assert ('form' in text_obj[input_morph_layer].attributes) and \
-                                   ('extended_form' in text_obj[input_morph_layer].attributes)
-                            # Swap 'form' and 'extended_form' values for stanza parser
-                            convert_original_morph_to_stanza_input_morph( text_obj[input_morph_layer] )
-                            # Tag syntax
-                            syntax_parser.tag( text_obj )
-                            # Swap 'form' and 'extended_form' values back
-                            convert_original_morph_to_stanza_input_morph( text_obj[input_morph_layer] )
-                            # Construct syntax layer for database
-                            db_syntax_layer = construct_db_syntax_layer(text_obj, 
-                                                                        text_obj[input_morph_layer], 
-                                                                        text_obj[syntax_parser.output_layer], 
-                                                                        syntax_layer_name, 
-                                                                        words_layer=input_words_layer, 
-                                                                        add_parent_and_children=True)
-                            text_obj.add_layer( db_syntax_layer )
-                            if add_layer_creation_time:
-                                # Add layer creation timestamp
-                                db_syntax_layer.meta['created_at'] = \
-                                    (datetime.now()).strftime('%Y-%m-%d')
-                            # Remove the temporary syntax layer
-                            text_obj.pop_layer( syntax_parser.output_layer )
-                            # Remove the input morph layer
-                            if output_remove_morph:
-                                text_obj.pop_layer( input_morph_layer )
-                            # Records statistics
-                            annotated_words += len( text_obj[db_syntax_layer.name] )
-                            annotated_sentences += len( text_obj[input_sentences_layer] )
-                            # Finally, save the results
-                            if output_mode == 'NEW_FILE':
-                                fpath_fname, fpath_ext = os.path.splitext( fpath )
-                                new_fpath = f'{fpath_fname}{output_file_infix}{fpath_ext}'
-                                assert new_fpath != fpath
-                                text_to_json( text_obj, file=new_fpath )
-                            else:
-                                text_to_json( text_obj, file=fpath )
-                            local_annotated_docs += 1
+                            try:
+                                text_obj = json_to_text(file = fpath)
+                                if skip_annotated and syntax_layer_name in text_obj.layers:
+                                    # Skip document (already annotated)
+                                    skipped_annotated_docs += 1
+                                    continue
+                                if input_morph_layer not in text_obj.layers:
+                                    raise Exception(f'(!) Input json document {fpath!r} is missing {input_morph_layer!r} layer. '+\
+                                                    f'Available layers: {text_obj.layers!r}.')
+                                assert ('form' in text_obj[input_morph_layer].attributes) and \
+                                       ('extended_form' in text_obj[input_morph_layer].attributes)
+                                # Swap 'form' and 'extended_form' values for stanza parser
+                                convert_original_morph_to_stanza_input_morph( text_obj[input_morph_layer] )
+                                # Tag syntax
+                                syntax_parser.tag( text_obj )
+                                # Swap 'form' and 'extended_form' values back
+                                convert_original_morph_to_stanza_input_morph( text_obj[input_morph_layer] )
+                                # Construct syntax layer for database
+                                db_syntax_layer = construct_db_syntax_layer(text_obj, 
+                                                                            text_obj[input_morph_layer], 
+                                                                            text_obj[syntax_parser.output_layer], 
+                                                                            syntax_layer_name, 
+                                                                            words_layer=input_words_layer, 
+                                                                            add_parent_and_children=True)
+                                text_obj.add_layer( db_syntax_layer )
+                                if add_layer_creation_time:
+                                    # Add layer creation timestamp
+                                    db_syntax_layer.meta['created_at'] = \
+                                        (datetime.now()).strftime('%Y-%m-%d')
+                                # Remove the temporary syntax layer
+                                text_obj.pop_layer( syntax_parser.output_layer )
+                                # Remove the input morph layer
+                                if output_remove_morph:
+                                    text_obj.pop_layer( input_morph_layer )
+                                # Records statistics
+                                annotated_words += len( text_obj[db_syntax_layer.name] )
+                                annotated_sentences += len( text_obj[input_sentences_layer] )
+                                # Finally, save the results
+                                if output_mode == 'NEW_FILE':
+                                    fpath_fname, fpath_ext = os.path.splitext( fpath )
+                                    new_fpath = f'{fpath_fname}{output_file_infix}{fpath_ext}'
+                                    assert new_fpath != fpath
+                                    text_to_json( text_obj, file=new_fpath )
+                                else:
+                                    text_to_json( text_obj, file=fpath )
+                                local_annotated_docs += 1
+                            except Exception as err:
+                                raise Exception(f'Failed at processing document {fpath!r} due to an error: ') from err
                         annotated_docs += 1 if local_annotated_docs > 0 else 0
                         if local_annotated_docs > 1:
                             annotated_split_docs += local_annotated_docs
