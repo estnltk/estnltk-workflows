@@ -180,7 +180,6 @@ if len(sys.argv) > 1:
                         annotated_docs += 1 if local_annotated_docs > 0 else 0
                         if local_annotated_docs > 1:
                             annotated_split_docs += local_annotated_docs
-                subdir_start_time = datetime.now()
                 print(f'Processing {vert_subdir} took {datetime.now()-subdir_start_time}.')
             if annotated_docs > 0 or skipped_annotated_docs > 0:
                 print()
