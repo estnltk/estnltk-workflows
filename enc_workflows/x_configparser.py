@@ -107,6 +107,7 @@ def parse_configuration( conf_file:str ):
             # parsing parameters
             clean_conf['skip_annotated'] = config[section].getboolean('skip_annotated', True)
             clean_conf['use_gpu'] = config[section].getboolean('use_gpu', False)
+            clean_conf['use_cpu_for_long_sentences'] = config[section].getboolean('use_cpu_for_long_sentences', False)
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
     if 'collection' in clean_conf.keys():
         # Return collected configuration
