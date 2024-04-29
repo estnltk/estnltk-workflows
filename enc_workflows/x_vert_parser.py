@@ -4,12 +4,17 @@
 #   * SimpleVertFileParser -- a simplified version of VertXMLFileParser for 
 #     document-wise parsing of .vert files;
 #
+#   * SyntaxVertFileWriter -- a class for augmenting documents read by  
+#     SimpleVertFileParser with syntactic annotations and writing into 
+#     new .vert files;
+#
 #
 
 from typing import List, Union, Any
 
 import re, sys
 import os, os.path
+import warnings
 
 from estnltk import Text
 from estnltk.corpus_processing.parse_enc import parse_tag_attributes
@@ -65,7 +70,8 @@ class SimpleVertFileParser:
         self.vert_file           = vert_file
         # Initialize the state of parsing
         self.parsing_finished    = False
-        self.lines               = 0
+        self.lines               = 0  # internal line counter used by _parse_next_line(...)
+        self.total_lines         = 0  # external line counter used by _document_collector(...)
         self.document_metadata   = {} # metadata of the document
         self.document_lines      = [] # lines of the document in the format: ( line_type, line )
         self.document_id         = -1 # index of the document in the vert file, starting from 0
@@ -95,6 +101,7 @@ class SimpleVertFileParser:
         '''
         with open( self.vert_file, mode='r', encoding='utf-8' ) as in_f:
             for line in in_f:
+                self.total_lines += 1
                 result = self._parse_next_line( line )
                 if result is not None:
                     # Return next document
@@ -226,22 +233,27 @@ class SimpleVertFileParser:
         m_s_end       = self.enc_s_tag_end.match(stripped_line)
         m_glue        = self.enc_glue_tag.match(stripped_line)
         m_unk_tag     = self.enc_unknown_tag.match(stripped_line)
+        p_or_s_tag    = False
         # *** New paragraph
         if m_par_start:
             # Add a new paragraph start
             self.document_lines.append( ('<p>', line.strip()) )
+            p_or_s_tag = True
         # *** Paragraph's end
         if m_par_end:
             self.document_lines.append( ('</p>', line.strip()) )
+            p_or_s_tag = True
         # *** New sentence
         if m_s_start:
             # Add a new sentence start
             self.document_lines.append( ('<s>', line.strip()) )
+            p_or_s_tag = True
         # *** Sentence end
         if m_s_end:
             self.document_lines.append( ('</s>', line.strip()) )
+            p_or_s_tag = True
         # *** The glue tag or an unknown tag
-        if m_glue or m_unk_tag:
+        if not p_or_s_tag and (m_glue or m_unk_tag):
             self.document_lines.append( ('<TAG>', line.strip()) )
             if m_glue:
                 self.last_was_glue = True
@@ -280,3 +292,180 @@ class SimpleVertFileParser:
             assert old_document_line_count == len(old_document_lines)
             return old_document_lines, old_document_metadata
         return None
+
+
+    def status_str(self):
+        '''Returns the parsing status message: completed/in progress and the number of lines parsed.'''
+        msg_str = 'Parsing completed.' if self.parsing_finished else 'Parsing in progress.'
+        return f'Total {self.total_lines} lines read from {self.vert_file!r}. {msg_str}'
+
+
+
+class SyntaxVertFileWriter:
+    '''A file writer for adding syntactic annotations to a vert file. 
+       Syntactic annotations will be added to the vert content extracted by SimpleVertFileParser.
+    '''
+
+    def __init__(self, vert_file:str, vert_file_dir:str=None):
+        '''Initializes the parser for writing into the `vert_file`. 
+           Optionally, `vert_file_dir` can be used to specify output dir. 
+        '''
+        # Remember paths
+        self.vert_file = vert_file
+        if vert_file_dir is not None:
+            os.makedirs(vert_file_dir, exist_ok=True)
+        self.vert_file_dir = vert_file_dir
+        self.vert_file_path = os.path.join(vert_file_dir, vert_file) \
+            if vert_file_dir is not None else vert_file
+        # Initialize file (erase the old content)
+        with open(self.vert_file_path, mode='w', encoding='utf-8') as out_f:
+            pass
+        # Initialize line buffer
+        self.line_buffer = []
+        self.max_buffer_size = 100000
+        self.total_lines_written = 0
+        self.completed = False
+
+
+    def write_sentence_start(self, vert_token: List[Any], sentence_hash:str=None, hash_attr:str='sha256'):
+        '''Writes out sentence start tag <s> with added `hash_attr="sentence_hash"` attribute.'''
+        assert vert_token[0] == '<s>'
+        if sentence_hash is not None:
+            assert isinstance(hash_attr, str)
+            assert isinstance(sentence_hash, str)
+            self._write_line(vert_token, modified_token=f'<s {hash_attr}="{sentence_hash}">')
+        else:
+            self._write_line(vert_token, modified_token=None)
+
+
+    def write_tag(self, vert_token: List[Any]):
+        '''Writes out a tag. 
+           If the tag has (unexpectedly) \t-separated annotations, then auguments 
+           tag's annotation fields with empty values to meet the exact length of a 
+           syntactically annotated line.'''
+        assert vert_token[0] != 'TOKEN'
+        original_line  = vert_token[1]
+        modified_token = None
+        # Check if the tag has (unexpectedly) \t-separated annotations
+        if '\t' in original_line:
+            items = original_line.split('\t')
+            if len(items) != 13:
+                msg_str = 'Padding with empty values.' if len(items) < 13 else 'Truncating excessive values.'
+                warnings.warn(f'(!) Unexpected number of features {len(items)} in the vert line {original_line!r}. {msg_str}')
+            while len(items) != 13:
+                if len(items) < 13:
+                    # Add empty value
+                    items.append('')
+                elif len(items) > 13:
+                    # Remove the last value
+                    items.pop(-1)
+            # Add empty values for syntactic annotations
+            items.extend(['']*8)
+            assert len(items) == 21
+            # Construct new output token
+            modified_token = '\t'.join(items)
+        self._write_line(vert_token, modified_token=modified_token)
+
+
+    def write_syntax_token(self, vert_token: List[Any], syntax_word_span: 'Span'):
+        '''Writes out a vert token with added syntactic annotations.'''
+        assert vert_token[0] == 'TOKEN'
+        #
+        # The output format is exemplified in the notebook:
+        #   https://github.com/estnltk/estnltk/blob/1.6.9.1b0_devel/scribbles/enc_processing.ipynb
+        #
+        
+        # Reminder: the syntax layer should have the following attributes:
+        #('id', 'lemma', 'root_tokens', 'clitic', 'xpostag', 'feats', 'extended_feats', 'head', 'deprel'),
+        
+        # Syntactic info from stanza
+        syn_id   = syntax_word_span.annotations[0]['id']
+        syn_head = syntax_word_span.annotations[0]['head']
+        syn_rel  = syntax_word_span.annotations[0]['deprel']
+
+        # Finally, add information about the syntactic head / parent
+        # (if the word is syntactic root, these fields will be empty)
+        head_word = ''
+        head_lemma = ''
+        head_tag = ''
+        head_features = ''
+        head_syn_rel = ''
+        if syntax_word_span.annotations[0]['parent_span'] is not None:
+            # Get parent token
+            parent_token = syntax_word_span.annotations[0]['parent_span']
+            # Get features of the parent token:
+            parent_analysis = parent_token.annotations[0]
+            head_word = parent_token.text
+            head_lemma = parent_analysis['lemma']
+            head_tag   = parent_analysis['xpostag']
+            head_features = '_'.join(parent_analysis['feats'].split())
+            head_syn_rel = parent_analysis['deprel']
+
+        original_line = vert_token[3]
+        assert isinstance(original_line, str)
+        items = original_line.split('\t')
+        if len(items) != 13:
+            # The original line from vert file should contain exactly 13 feature values. 
+            # If not, then the original line is malformed. Add empty values or truncate excessive values.
+            msg_str = 'Padding with empty values.' if len(items) < 13 else 'Truncating excessive values.'
+            warnings.warn(f'(!) Unexpected number of features {len(items)} {items!r} in the vert line {original_line!r}. {msg_str}')
+            while len(items) != 13:
+                if len(items) < 13:
+                    # Add empty value
+                    items.append('')
+                elif len(items) > 13:
+                    # Remove the last value
+                    items.pop(-1)
+            assert len(items) == 13
+            # Construct new original_line
+            original_line = '\t'.join(items)
+        modified_line = f'{original_line}\t{syn_id}\t{syn_head}\t{syn_rel}\t{head_word}\t{head_lemma}\t{head_tag}\t{head_features}\t{head_syn_rel}'
+        modified_line = modified_line.replace('\n', ' ')
+        self._write_line(vert_token, modified_token=modified_line)
+
+
+    def _write_line(self, vert_token: List[Any], modified_token:str=None):
+        '''Writes vert_token into the file (buffer). 
+           If modified_token is not None, then writes modified_token instead of the 
+           modified_token value.
+        '''
+        if vert_token[0] == 'TOKEN':
+            # Write token
+            original_line = vert_token[3]
+            self.line_buffer.append(original_line if modified_token is None else modified_token)
+        else:
+            # Write tag
+            original_line = vert_token[1]
+            self.line_buffer.append(original_line if modified_token is None else modified_token)
+        if len(self.line_buffer) > self.max_buffer_size: # Flush the buffer (if needed)
+            self._write_out_buffer()
+            self.line_buffer = []
+
+
+    def finish_writing(self):
+        '''Completes the writing process: writes remaining contents of the buffer into the file.'''
+        if len(self.line_buffer) > 0:
+            self._write_out_buffer()
+            self.line_buffer = []
+        self.completed = True
+
+
+    def _write_out_buffer(self):
+        '''Writes contents of the line buffer into the vert file.'''
+        if len(self.line_buffer) > 0:
+            with open(self.vert_file_path, mode='a', encoding='utf-8') as out_f:
+                if self.total_lines_written > 0:
+                    # Continue writing: separate the last and the first line with newline
+                    out_f.write('\n')
+                for lid, line in enumerate(self.line_buffer):
+                    out_f.write(line)
+                    self.total_lines_written += 1
+                    if lid < len(self.line_buffer)-1:
+                        # Only add newline if this is not the last line
+                        out_f.write('\n')
+
+
+    def status_str(self):
+        '''Returns the writing status message: completed/in progress and the number of lines written.'''
+        msg_str = 'Writing completed.' if self.completed else 'Writing in progress.'
+        return f'Total {self.total_lines_written} lines written into {self.vert_file!r}. {msg_str}'
