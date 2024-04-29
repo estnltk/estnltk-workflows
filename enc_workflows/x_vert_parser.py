@@ -328,7 +328,10 @@ class SyntaxVertFileWriter:
 
 
     def write_sentence_start(self, vert_token: List[Any], sentence_hash:str=None, hash_attr:str='sha256'):
-        '''Writes out sentence start tag <s> with added `hash_attr="sentence_hash"` attribute.'''
+        '''Writes out sentence start tag <s> with added `hash_attr="sentence_hash"` attribute.
+           This hash is a fingerprint of the sentence tokenization 
+           (for details, see `x_utils.get_sentence_hash(...)`).
+        '''
         assert vert_token[0] == '<s>'
         if sentence_hash is not None:
             assert isinstance(hash_attr, str)
