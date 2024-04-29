@@ -109,6 +109,25 @@ def parse_configuration( conf_file:str ):
             clean_conf['use_gpu'] = config[section].getboolean('use_gpu', False)
             clean_conf['use_cpu_for_long_sentences'] = config[section].getboolean('use_cpu_for_long_sentences', False)
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
+        if section.startswith('write_syntax_to_vert'):
+            #
+            # Load configuration for writing syntactic annotations to (a new) vert file
+            #
+            if not config.has_option(section, 'vert_output_dir'):
+                raise ValueError(f'Error in {conf_file}: section {section!r} is missing "vert_output_dir" parameter.')
+            # Output directory for new vert files
+            vert_output_dir = str(config[section]['vert_output_dir'])
+            if not vert_output_dir.isidentifier():
+                raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {vert_output_dir!r} for parameter "vert_output_dir". '+
+                                  'Expected a legitimate identifier.')
+            clean_conf['vert_output_dir'] = vert_output_dir
+            if not config.has_option(section, 'vert_output_suffix'):
+                raise ValueError(f'Error in {conf_file}: section {section!r} is missing "vert_output_suffix" parameter.')
+            # Suffix to be added to the end of the new vert file name
+            vert_output_suffix = str(config[section]['vert_output_suffix']).strip()
+            if len(vert_output_suffix) == 0:
+                raise ValueError(f'Error in {conf_file}: section {section} has empty "vert_output_suffix" parameter.')
+            clean_conf['vert_output_suffix'] = vert_output_suffix
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf
