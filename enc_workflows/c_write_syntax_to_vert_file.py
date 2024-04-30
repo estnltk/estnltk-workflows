@@ -66,6 +66,7 @@ if len(sys.argv) > 1:
             if len(vert_subdirs) == 0:
                 warnings.warn(f'(!) No document subdirectories found from collection dir {configuration["collection"]!r}')
             for vert_subdir in vert_subdirs:
+                # Start processing one vert_file / vert_subdir
                 subdir_start_time = datetime.now()
                 print(f'Processing {vert_subdir} ...')
                 full_subdir = os.path.join(configuration['collection'], vert_subdir)
@@ -231,12 +232,16 @@ if len(sys.argv) > 1:
                             json_start = found_json_texts[0].text[:100] if found_json_texts else None
                             raise Exception(f'(!) No vert doc available for the json document with id {json_doc_id}.'+\
                                             f'\n\njson document start: {json_start}')
+                
+                # Complete one vert file
                 progress_bar.close()
                 vert_file_writer.finish_writing()
                 # Output reading and writing statuses
                 print( vert_file_parser.status_str() )
                 print( vert_file_writer.status_str() )
                 print(f'Processing {vert_subdir} took {datetime.now()-subdir_start_time}.')
+                
+            # Complete the whole collection
             if processed_docs > 0:
                 print()
                 print(f' =={collection_directory}==')

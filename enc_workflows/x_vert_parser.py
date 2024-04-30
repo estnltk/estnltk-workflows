@@ -428,9 +428,9 @@ class SyntaxVertFileWriter:
 
 
     def _write_line(self, vert_token: List[Any], modified_token:str=None):
-        '''Writes vert_token into the file (buffer). 
-           If modified_token is not None, then writes modified_token instead of the 
-           modified_token value.
+        '''Writes `vert_token` into the file (buffer). 
+           If `modified_token` is not `None`, then writes `modified_token` instead of the 
+           `vert_token` value.
         '''
         if vert_token[0] == 'TOKEN':
             # Write token
@@ -445,11 +445,16 @@ class SyntaxVertFileWriter:
             self.line_buffer = []
 
 
-    def finish_writing(self):
-        '''Completes the writing process: writes remaining contents of the buffer into the file.'''
+    def finish_writing(self, add_newline=True):
+        '''Completes the writing process: writes remaining contents of the buffer into the file.
+           If `add_newline` is True (default), then adds newline at the end of the file.
+        '''
         if len(self.line_buffer) > 0:
             self._write_out_buffer()
             self.line_buffer = []
+        if add_newline:
+            with open(self.vert_file_path, mode='a', encoding='utf-8') as out_f:
+                out_f.write('\n')
         self.completed = True
 
 
