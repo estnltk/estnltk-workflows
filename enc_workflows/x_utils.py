@@ -16,6 +16,9 @@ from estnltk.taggers import Retagger
 from estnltk_core import EnvelopingSpan
 from estnltk.converters import layer_to_json
 from estnltk.converters import text_to_json
+from estnltk.converters import json_to_text
+from estnltk.converters import layer_to_dict
+from estnltk.converters import dict_to_layer
 
 from estnltk_core.layer_operations import extract_sections
 
@@ -545,3 +548,52 @@ def construct_db_syntax_layer(text_obj: Text, morph_layer: Layer, syntax_layer: 
         layer.serialisation_module = syntax_v0.__version__
     assert len(layer) == len(syntax_layer)
     return layer
+
+
+# ======================================================================
+#  Load/Create layer templates (for database insertion)
+# ======================================================================
+
+def load_collection_layer_templates(configuration: dict):
+    '''
+    Creates collection layer templates based on the first annotated JSON document. 
+    Assumes all other JSON documents have the same structure / same layers as the first 
+    document. 
+    The `configuration` is used to find subdirectories of collection's documents. 
+    Raises exceptions if no subdirectories nor documents are found. 
+    Returns a list of Layer objects.
+    '''
+    assert 'collection' in configuration, f'(!) Configuration is missing "collection" parameter.'
+    vert_subdirs = collect_collection_subdirs(configuration['collection'], only_first_level=True, full_paths=False)
+    if len(vert_subdirs) == 0:
+        raise FileNotFoundError(f'(!) No document subdirectories found from collection dir {configuration["collection"]!r}')
+    # Collect the first document from JSON files. All other documents should have the same structure / same layers
+    first_text = None
+    full_subdir = os.path.join( configuration['collection'], vert_subdirs[0] )
+    document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
+    if len(document_subdirs) == 0:
+        raise FileNotFoundError(f'(!) No JSON document subdirectories found from collection dir {full_subdir!r}')
+    json_doc_subdir = document_subdirs[0]
+    for fname in sorted( os.listdir(json_doc_subdir) ):
+        if fname.startswith('doc') and fname.endswith('.json'):
+            # Load Text object
+            fpath = os.path.join(json_doc_subdir, fname)
+            first_text = json_to_text(file = fpath)
+            # Break, no need to look further
+            break
+    if first_text is not None:
+        # Create layer templates (simply erase annotations)
+        templates = []
+        for layer_obj in first_text.sorted_layers():
+            layer_dict = layer_to_dict(layer_obj)
+            # Remove all annotations from the layer
+            if 'spans' in layer_dict.keys():
+                layer_dict['spans'] = []
+            elif 'relations' in layer_dict.keys():
+                layer_dict['relations'] = []
+            # Remove layer metadata
+            layer_dict['meta'] = {}
+            templates.append( dict_to_layer(layer_dict) )
+        return templates
+    else:
+        raise FileNotFoundError(f'(!) No JSON documents found from collection dir {json_doc_subdir!r}')

@@ -197,12 +197,12 @@ def parse_database_configuration( conf_file:str ):
                 schema_raw = str(config[section]['schema']).strip()
                 if len(schema_raw) > 0:  # only take non-empty string
                     schema = schema_raw
+            db_conf['db_schema'] = schema
             role = None
             if config.has_option(section, 'role'):
                 role_raw = str(config[section]['role']).strip()
                 if len(role_raw) > 0:  # only take non-empty string
                     role = role_raw
-            db_conf['db_schema'] = schema
             db_conf['db_role'] = role
             #
             # B) user provided host, port, database, username, password, schema and role explicitly;
@@ -246,3 +246,5 @@ def parse_database_configuration( conf_file:str ):
     if not db_info_found:
         print(f'No section starting with "database" in {conf_file}. Unable to collect database information.')
     return None
+
+

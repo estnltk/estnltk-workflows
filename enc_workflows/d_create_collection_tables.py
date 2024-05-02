@@ -18,6 +18,7 @@ import warnings
 from estnltk import logger
 from estnltk.storage import postgres as pg
 
+from x_db_utils import create_collection_layer_tables
 from x_configparser import parse_configuration
 
 # Overwrite existing collection
@@ -66,8 +67,10 @@ if len(sys.argv) > 1:
             # Add new collection
             meta = {'src': 'str'} if configuration['src_as_meta'] else None
             storage.add_collection( collection_name, description=collection_description, meta=meta )
-            
-            # TODO: create collection tables
+
+            # Create collection layer tables
+            collection = storage[collection_name]
+            create_collection_layer_tables(configuration, collection)
             
             # Close connection
             storage.close()
