@@ -19,6 +19,7 @@ from estnltk.storage.postgres import structure_table_identifier
 from estnltk.storage.postgres import layer_table_exists
 from estnltk.storage.postgres import layer_table_name
 
+from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
 
 
@@ -120,4 +121,79 @@ def create_collection_layer_tables( configuration: dict, collection: 'pg.PgColle
         logger.info('{} layer {!r} created from template'.format(layer_type, template.name))
 
 
+def metadata_table_name(collection_name):
+    return collection_name + '__metadata'
 
+
+def metadata_table_identifier(storage, collection_name):
+    table_name = metadata_table_name(collection_name)
+    return pg.table_identifier(storage, table_name)
+
+
+def metadata_table_exists( collection: 'pg.PgCollection' ):
+    metadata_table = metadata_table_name(collection.name)
+    return pg.table_exists(collection.storage, metadata_table, omit_commit=True, omit_rollback=True)
+
+
+def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCollection', description:str = None ):
+    '''
+    Creates collection's metadata table. 
+    The `configuration` is used to locate collection's subdirectory, which must also 
+    contain file 'meta_fields.txt' that has the names of all metadata fields.
+    '''
+    # Validate inputs
+    assert 'collection' in configuration, \
+        f'(!) Configuration is missing "collection" parameter.'
+    collection_dir = configuration['collection']
+    assert os.path.exists(collection_dir), \
+        f'(!) Missing collection subdirectory {collection_dir!r}'
+    metadata_file = os.path.join(collection_dir, 'meta_fields.txt')
+    assert os.path.exists(metadata_file), \
+        f'(!) Missing collection metadata file {metadata_file!r}'
+    # Load collection's metadata fields
+    meta_fields = MetaFieldsCollector.load_meta_fields( metadata_file )
+    # Rename 'id' -> 'vert_id'
+    new_meta_fields = []
+    for field in meta_fields:
+        if field == 'id':
+            new_meta_fields.append('vert_id')
+        else:
+            new_meta_fields.append(field)
+    # Construct metadata table name/identifier
+    metadata_table = metadata_table_name(collection.name)
+    if metadata_table_exists( collection ):
+        raise Exception("The metadata table for the collection {!r} already exists.".format(collection.name))
+    table_identifier = metadata_table_identifier(collection.storage, collection.name)
+    # Prepare columns
+    columns = [SQL('id BIGSERIAL PRIMARY KEY'),
+               SQL('text_id INT NOT NULL')]
+    for field in new_meta_fields:
+        # All meta fields are string fields
+        columns.append( SQL(f'{field} TEXT') )
+    conn = collection.storage.conn
+    with conn.cursor() as cur:
+        try:
+            # Create table
+            cur.execute(SQL("CREATE TABLE {} ({});").format(table_identifier, SQL(', ').join(columns)))
+            logger.debug(cur.query.decode())
+            # Add table's comment
+            comment = Literal('created by {} on {}'.format(collection.storage.user, time.asctime()))
+            if isinstance(description, str):
+                comment = Literal(description)
+            q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
+            cur.execute(q)
+            logger.debug(cur.query.decode())
+        except Exception as table_creation_error:
+            conn.rollback()
+            raise PgCollectionException("can't create metadata table {!r}".format(metadata_table)) from table_creation_error
+        finally:
+            if conn.status == STATUS_BEGIN:
+                # no exception, transaction in progress
+                conn.commit()
+    logger.info('created collection metadata table with fields {}'.format(new_meta_fields))
+
+
+
+def drop_collection_metadata_table( collection: 'pg.PgCollection', cascade: bool = False):
+    metadata_table = metadata_table_name(collection.name)
+    pg.drop_table(collection.storage, metadata_table)

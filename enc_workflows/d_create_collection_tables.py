@@ -18,8 +18,11 @@ import warnings
 from estnltk import logger
 from estnltk.storage import postgres as pg
 
-from x_db_utils import create_collection_layer_tables
 from x_configparser import parse_configuration
+from x_db_utils import create_collection_layer_tables
+from x_db_utils import create_collection_metadata_table
+from x_db_utils import metadata_table_exists
+from x_db_utils import drop_collection_metadata_table
 
 # Overwrite existing collection
 overwrite_existing = False
@@ -61,8 +64,10 @@ if len(sys.argv) > 1:
                     raise Exception(storage_exists_error_msg)
                 else:
                     logger.info( f'Removing existing collection {collection_name!r}.' )
+                    collection = storage[collection_name]
+                    if metadata_table_exists(collection):
+                        drop_collection_metadata_table(collection)
                     storage.delete_collection(collection_name)
-                    # TODO: remove other collection tables
             
             # Add new collection
             meta = {'src': 'str'} if configuration['src_as_meta'] else None
@@ -71,6 +76,9 @@ if len(sys.argv) > 1:
             # Create collection layer tables
             collection = storage[collection_name]
             create_collection_layer_tables(configuration, collection)
+            
+            # Create collection metadata table
+            create_collection_metadata_table(configuration, collection)
             
             # Close connection
             storage.close()
