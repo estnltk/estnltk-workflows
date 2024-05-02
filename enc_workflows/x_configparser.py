@@ -7,7 +7,7 @@ import os, os.path
 import configparser
 import logging
 
-def parse_configuration( conf_file:str ):
+def parse_configuration( conf_file:str, load_db_conf:bool=False ):
     '''Parses ENC processing configuration parameters from the given INI file.'''
     # Parse configuration file
     config = configparser.ConfigParser()
@@ -128,9 +128,121 @@ def parse_configuration( conf_file:str ):
             if len(vert_output_suffix) == 0:
                 raise ValueError(f'Error in {conf_file}: section {section} has empty "vert_output_suffix" parameter.')
             clean_conf['vert_output_suffix'] = vert_output_suffix
+        if section.startswith('database_conf') and load_db_conf:
+            #
+            # Load Postgres database configuration
+            #
+            # Get connection parameters from separate file
+            if not config.has_option(section, 'conf_file'):
+                raise ValueError(f'Error in {conf_file}: section {section!r} is missing "conf_file" parameter.')
+            db_conf_file = str(config[section]['conf_file']).strip()
+            if len( db_conf_file ) == 0 or not os.path.isfile( db_conf_file ):
+                raise FileNotFoundError(f'Error in {conf_file}: section {section!r} parameter "conf_file" '+\
+                                        f'points to an invalid or missing conf file: {db_conf_file!r}')
+            db_conf_dict = parse_database_configuration( db_conf_file )
+            db_keys  = set(db_conf_dict.keys())
+            cur_keys = set(clean_conf.keys())
+            intersecting = db_keys.intersection(cur_keys)
+            if len(intersecting) > 0:
+                # Sanity check: avoid overlapping parameter names
+                raise ValueError(f'Error in {conf_file}: unexpectedly, database conf and main conf contain parameters '+\
+                                 f'with overlapping names: {intersecting}')
+            # Merge db conf into main conf
+            clean_conf.update( db_conf_dict )
+            #
+            # Parse other parameters required for DB creation
+            #
+            # Description of the collection. 
+            # If not provided, then the description will be 'created by {user} on {creation_time}'.
+            clean_conf['collection_description'] = config[section].get('collection_description', None)
+            # Add src as collection table meta field
+            clean_conf['src_as_meta'] = config[section].getboolean('src_as_meta', True)
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf
     if not collection_info_found:
         print(f'No section starting with "collection" in {conf_file}. Unable to collect collection information.')
+    return None
+
+
+
+def parse_database_configuration( conf_file:str ):
+    '''Parses Postgres' database configuration parameters from the given INI file.'''
+    # Parse configuration file
+    config = configparser.ConfigParser()
+    if conf_file is None or not os.path.exists(conf_file):
+        raise FileNotFoundError("Config file {} does not exist".format(conf_file))
+    if len(config.read(conf_file)) != 1:
+        raise ValueError("File {} is not accessible or is not in valid INI format".format(conf_file))
+    db_conf = {}
+    db_info_found = False
+    for section in config.sections():
+        if section.startswith('database'):
+            #
+            # Parse Postgres database configuration
+            #
+            db_info_found = True
+            #
+            # A) user provided only pgpass_file (that contains host:port:dbname:user:password ), schema and role;
+            #
+            pgpass_file = None
+            if config.has_option(section, 'pgpass_file'):
+                pgpass_file = str(config[section]['pgpass_file']).strip()
+                if len( pgpass_file ) == 0 or os.path.isfile( pgpass_file ):
+                    raise FileNotFoundError(f'Error in {conf_file}: section {section!r} parameter "pgpass_file" '+\
+                                            f'points to an invalid or missing file: {pgpass_file!r}')
+            db_conf['db_pgpass_file'] = pgpass_file
+            schema = None
+            if config.has_option(section, 'schema'):
+                schema_raw = str(config[section]['schema']).strip()
+                if len(schema_raw) > 0:  # only take non-empty string
+                    schema = schema_raw
+            role = None
+            if config.has_option(section, 'role'):
+                role_raw = str(config[section]['role']).strip()
+                if len(role_raw) > 0:  # only take non-empty string
+                    role = role_raw
+            db_conf['db_schema'] = schema
+            db_conf['db_role'] = role
+            #
+            # B) user provided host, port, database, username, password, schema and role explicitly;
+            #
+            host = None
+            if config.has_option(section, 'host'):
+                str_raw = str(config[section]['host']).strip()
+                if len(str_raw) > 0:  # only take non-empty string
+                    host = str_raw
+            db_conf['db_host'] = host
+            port = None
+            if config.has_option(section, 'port'):
+                str_raw = str(config[section]['port']).strip()
+                if len(str_raw) > 0:  # only take non-empty string
+                    try:
+                        port = int(str_raw)
+                    except ValueError:
+                        port = str_raw
+            db_conf['db_port'] = port
+            database = None
+            if config.has_option(section, 'database'):
+                str_raw = str(config[section]['database']).strip()
+                if len(str_raw) > 0:  # only take non-empty string
+                    database = str_raw
+            db_conf['db_name'] = database
+            username = None
+            if config.has_option(section, 'username'):
+                str_raw = str(config[section]['username']).strip()
+                if len(str_raw) > 0:  # only take non-empty string
+                    username = str_raw
+            db_conf['db_username'] = username
+            password = None
+            if config.has_option(section, 'password'):
+                password = config[section]['password']
+            db_conf['db_password'] = password
+            #
+            #  Other optional parameters
+            #
+            db_conf['create_schema_if_missing'] = config[section].getboolean('create_schema_if_missing', False)
+            return db_conf
+    if not db_info_found:
+        print(f'No section starting with "database" in {conf_file}. Unable to collect database information.')
     return None
