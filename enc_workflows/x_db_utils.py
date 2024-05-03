@@ -15,7 +15,6 @@ from psycopg2.extensions import STATUS_BEGIN
 from psycopg2.sql import SQL, Identifier, Literal, DEFAULT
 
 from estnltk import logger
-from estnltk.converters import json_to_text
 from estnltk.storage import postgres as pg
 from estnltk.storage.postgres import structure_table_identifier
 from estnltk.storage.postgres import layer_table_exists
@@ -245,12 +244,12 @@ def retrieve_collection_meta_fields( collection: 'pg.PgCollection', exclude_syst
 
 def drop_collection_metadata_table( collection: 'pg.PgCollection', cascade: bool = False):
     metadata_table = metadata_table_name(collection.name)
-    pg.drop_table(collection.storage, metadata_table)
+    pg.drop_table(collection.storage, metadata_table, cascade=cascade)
 
 
 # ===================================================================
 #  Collection's sentence hash table
-#  ( contains sentences with their hash fingerprints )
+#  ( contains hash fingerprints of all sentences in the collection )
 # ===================================================================
 
 def sentence_hash_table_name(collection_name, layer_name:str='sentences'):
@@ -292,7 +291,7 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
                             f'among the layer templates {template_names!r}. Make sure add_sentence_hashes '+\
                             'was switched on while exporting documents to JSON. ')
     # Construct sentence hash table name/identifier
-    sentence_hash_table = sentence_hash_table_name(collection.name)
+    sentence_hash_table = sentence_hash_table_name(collection.name, layer_name=layer_name )
     if sentence_hash_table_exists( collection, layer_name=layer_name ):
         raise Exception( "The sentence hash table {!r} already exists in the collection {!r}.".format( \
                          sentence_hash_table, collection.name) )
@@ -320,11 +319,11 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
             if conn.status == STATUS_BEGIN:
                 # no exception, transaction in progress
                 conn.commit()
-    logger.info('created collection\'s {} hash table table'.format(layer_name))
+    logger.info('created collection\'s {} hash table'.format(layer_name))
 
 
 def drop_sentence_hash_table( collection: 'pg.PgCollection', layer_name:str='sentences', \
                               cascade: bool = False):
     table_name = sentence_hash_table_name(collection.name, layer_name=layer_name)
-    pg.drop_table(collection.storage, table_name)
+    pg.drop_table(collection.storage, table_name, cascade=cascade)
 

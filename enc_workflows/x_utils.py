@@ -229,6 +229,7 @@ def normalize_src( src:str ):
     return src
 
 
+# Smoke-tests for function normalize_src()
 assert normalize_src('Web 2021') == 'Web 2021'
 assert normalize_src('Web 2023') == 'Web 2023'
 assert normalize_src('Wikipedia 2023') == 'Wikipedia'

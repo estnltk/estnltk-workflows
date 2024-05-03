@@ -150,10 +150,10 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
                 # Sanity check: avoid overlapping parameter names
                 raise ValueError(f'Error in {conf_file}: unexpectedly, database conf and main conf contain parameters '+\
                                  f'with overlapping names: {intersecting}')
-            # Merge db conf into main conf
+            # Merge db access conf into main conf
             clean_conf.update( db_conf_dict )
             #
-            # Parse other parameters required for DB creation
+            # Parse parameters required for collection table creation
             #
             # Description of the collection table. 
             # If not provided, then the description will be 'created by {user} on {creation_time}'.
