@@ -172,7 +172,8 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
     new_meta_fields = []
     for field in meta_fields:
         if field == 'id':
-            new_meta_fields.append('initial_id')
+            if not configuration['remove_initial_id']:
+                new_meta_fields.append('initial_id')
         else:
             if field in forbidden_field_names:
                 raise ValueError( f'(!) Cannot used {field!r} as a metadata table column '+\
