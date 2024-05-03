@@ -206,6 +206,36 @@ class MetaFieldsCollector:
         return meta_fields
 
 
+def normalize_src( src:str ):
+    '''Normalizes metadata field `src` before database insertion.
+       The intention is to remove year (range) suffixes if the 
+       year information can change in future.
+    '''
+    if isinstance(src, str):
+        if src.startswith('Balanced Corpus'):
+            return 'Balanced Corpus'
+        elif src.startswith('Reference Corpus'):
+            return 'Reference Corpus'
+        elif src.startswith('Academic Texts'):
+            return 'Academic Texts'
+        elif src.startswith('Timestamped'):
+            return 'Timestamped'
+        elif src.startswith('Wikipedia'):
+            return 'Wikipedia'
+        elif src.startswith('Literature Old'):
+            return 'Literature Old'
+        elif src.startswith('Literature Contemporary'):
+            return 'Literature Contemporary'
+    return src
+
+
+assert normalize_src('Web 2021') == 'Web 2021'
+assert normalize_src('Web 2023') == 'Web 2023'
+assert normalize_src('Wikipedia 2023') == 'Wikipedia'
+assert normalize_src('Literature Old 1864–1945') == 'Literature Old'
+assert normalize_src('Literature Contemporary 2000–2023') == 'Literature Contemporary'
+
+
 # ======================================================================
 #  Document splitting
 # ======================================================================
