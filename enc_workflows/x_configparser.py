@@ -128,18 +128,21 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             if len(vert_output_suffix) == 0:
                 raise ValueError(f'Error in {conf_file}: section {section} has empty "vert_output_suffix" parameter.')
             clean_conf['vert_output_suffix'] = vert_output_suffix
-        if section.startswith('database_conf') and load_db_conf:
+        if load_db_conf and section.startswith('database_conf'):
             #
             # Load Postgres database configuration
             #
-            # Get connection parameters from separate file
+            # Get database access parameters from separate file
             if not config.has_option(section, 'conf_file'):
                 raise ValueError(f'Error in {conf_file}: section {section!r} is missing "conf_file" parameter.')
             db_conf_file = str(config[section]['conf_file']).strip()
             if len( db_conf_file ) == 0 or not os.path.isfile( db_conf_file ):
                 raise FileNotFoundError(f'Error in {conf_file}: section {section!r} parameter "conf_file" '+\
                                         f'points to an invalid or missing conf file: {db_conf_file!r}')
-            db_conf_dict = parse_database_configuration( db_conf_file )
+            db_conf_dict = parse_database_access_configuration( db_conf_file )
+            if db_conf_dict is None:
+                raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                  f'could not find any database access parameters from {db_conf_file}.' )
             db_keys  = set(db_conf_dict.keys())
             cur_keys = set(clean_conf.keys())
             intersecting = db_keys.intersection(cur_keys)
@@ -166,8 +169,8 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
 
 
 
-def parse_database_configuration( conf_file:str ):
-    '''Parses Postgres' database configuration parameters from the given INI file.'''
+def parse_database_access_configuration( conf_file:str ):
+    '''Parses Postgres' database access configuration parameters from the given INI file.'''
     # Parse configuration file
     config = configparser.ConfigParser()
     if conf_file is None or not os.path.exists(conf_file):
@@ -175,13 +178,10 @@ def parse_database_configuration( conf_file:str ):
     if len(config.read(conf_file)) != 1:
         raise ValueError("File {} is not accessible or is not in valid INI format".format(conf_file))
     db_conf = {}
-    db_info_found = False
     for section in config.sections():
-        if section.startswith('database'):
+        if section.startswith('database_access'):
             #
-            # Parse Postgres database configuration
-            #
-            db_info_found = True
+            # Parse Postgres database access configuration
             #
             # A) user provided only pgpass_file (that contains host:port:dbname:user:password ), schema and role;
             #
@@ -243,8 +243,29 @@ def parse_database_configuration( conf_file:str ):
             #
             db_conf['create_schema_if_missing'] = config[section].getboolean('create_schema_if_missing', False)
             return db_conf
-    if not db_info_found:
-        print(f'No section starting with "database" in {conf_file}. Unable to collect database information.')
     return None
 
 
+def validate_database_access_parameters( configuration:dict ):
+    '''
+    Validates that the given configuration contains a complete database access configuration.
+    If the configuration appears incomplete, throws an informing exception.
+    '''
+    host       = configuration.get('db_host', None)
+    port       = configuration.get('db_port', None)
+    dbname     = configuration.get('db_name', None)
+    user       = configuration.get('db_username', None)
+    password   = configuration.get('db_password', None)
+    pgpass_file= configuration.get('db_pgpass_file', None)
+    schema     = configuration.get('db_schema', None)
+    role       = configuration.get('db_role', None)
+    first_unsatisfied = pgpass_file is None or schema is None
+    second_unsatisfied = host is None or port is None or \
+                         dbname is None or user is None or \
+                         schema is None
+    if first_unsatisfied and second_unsatisfied:
+        raise Exception('(!) Incomplete database access configuration. '+\
+                        'Database access configuration must provide either '+\
+                        '1) pgpass_file (that contains host:port:dbname:user:password ), '+\
+                        'schema and role; or 2) explicit values for host, port, database, '+\
+                        'username, password, schema and role;')
