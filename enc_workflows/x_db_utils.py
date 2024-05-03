@@ -8,6 +8,8 @@ import re, sys
 import os, os.path
 import time
 
+from collections import OrderedDict
+
 import psycopg2
 from psycopg2.extensions import STATUS_BEGIN
 from psycopg2.sql import SQL, Identifier, Literal, DEFAULT
@@ -139,7 +141,7 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
     '''
     Creates collection's metadata table. 
     The `configuration` is used to locate collection's subdirectory, which must also 
-    contain file 'meta_fields.txt' that has the names of all metadata fields.
+    contain file 'meta_fields.txt' that has the names of all metadata fields. 
     '''
     # Validate inputs
     assert 'collection' in configuration, \
@@ -208,6 +210,27 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
                 conn.commit()
     logger.info('created collection metadata table with fields {}'.format(new_meta_fields))
 
+
+def retrieve_collection_meta_fields( collection: 'pg.PgCollection', exclude_system_fields:bool=False ):
+    '''
+    Retrieves names and types of columns in the collection metadata table. 
+    If `exclude_system_fields` is set, then removes columns 'id' and 'text_id' 
+    which are used only for system purposes. 
+    '''
+    if not metadata_table_exists(collection):
+        raise Exception(f'(!) Collection {collection.name!r} has no metadata table.')
+    with collection.storage.conn:
+        with collection.storage.conn.cursor() as c:
+            c.execute(SQL('SELECT column_name, data_type from information_schema.columns '
+                          'WHERE table_schema={} and table_name={} '
+                          'ORDER BY ordinal_position'
+                          ).format(Literal(collection.storage.schema), 
+                                   Literal(metadata_table_name(collection.name))))
+            meta_table_fields = OrderedDict(c.fetchall())
+            if exclude_system_fields:
+                del meta_table_fields['id']
+                del meta_table_fields['text_id']
+            return meta_table_fields
 
 
 def drop_collection_metadata_table( collection: 'pg.PgCollection', cascade: bool = False):
