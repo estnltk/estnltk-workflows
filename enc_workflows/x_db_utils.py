@@ -135,7 +135,7 @@ def metadata_table_exists( collection: 'pg.PgCollection' ):
     return pg.table_exists(collection.storage, metadata_table, omit_commit=True, omit_rollback=True)
 
 
-def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCollection', description:str = None ):
+def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCollection' ):
     '''
     Creates collection's metadata table. 
     The `configuration` is used to locate collection's subdirectory, which must also 
@@ -150,14 +150,24 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
     metadata_file = os.path.join(collection_dir, 'meta_fields.txt')
     assert os.path.exists(metadata_file), \
         f'(!) Missing collection metadata file {metadata_file!r}'
+    # Forbidden metadata column names
+    forbidden_field_names = ['id', 'text_id', 'initial_id']
+    if configuration['add_vert_indexing_info']:
+        forbidden_field_names.extend( ['_vert_file', '_vert_doc_id', \
+                                       '_vert_doc_start_line', '_vert_doc_end_line'] )
     # Load collection's metadata fields
     meta_fields = MetaFieldsCollector.load_meta_fields( metadata_file )
-    # Rename 'id' -> 'vert_id'
+    # Rename 'id' -> 'initial_id' and check for forbidden column names
     new_meta_fields = []
     for field in meta_fields:
         if field == 'id':
-            new_meta_fields.append('vert_id')
+            new_meta_fields.append('initial_id')
         else:
+            if field in forbidden_field_names:
+                raise ValueError( f'(!) Cannot used {field!r} as a metadata table column '+\
+                                  f'name, because name {field!r} is already reserved for '+\
+                                  'system purposes. Modify x_db_utils.create_collection_metadata_table() '+\
+                                  'and rename the metadata field.')
             new_meta_fields.append(field)
     # Construct metadata table name/identifier
     metadata_table = metadata_table_name(collection.name)
@@ -168,8 +178,14 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
     columns = [SQL('id BIGSERIAL PRIMARY KEY'),
                SQL('text_id INT NOT NULL')]
     for field in new_meta_fields:
-        # All meta fields are string fields
+        # Add all meta fields as string fields
         columns.append( SQL(f'{field} TEXT') )
+    # Add information about document location in the original vert file
+    if configuration['add_vert_indexing_info']:
+        columns.append( SQL(f'_vert_file TEXT') )
+        columns.append( SQL(f'_vert_doc_id TEXT') )
+        columns.append( SQL(f'_vert_doc_start_line TEXT') )
+        columns.append( SQL(f'_vert_doc_end_line TEXT') )
     conn = collection.storage.conn
     with conn.cursor() as cur:
         try:
@@ -178,8 +194,8 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
             logger.debug(cur.query.decode())
             # Add table's comment
             comment = Literal('created by {} on {}'.format(collection.storage.user, time.asctime()))
-            if isinstance(description, str):
-                comment = Literal(description)
+            if isinstance(configuration['metadata_description'], str):
+                comment = Literal(configuration['metadata_description'])
             q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
             cur.execute(q)
             logger.debug(cur.query.decode())

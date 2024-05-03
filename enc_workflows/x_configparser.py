@@ -155,11 +155,21 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             #
             # Parse other parameters required for DB creation
             #
-            # Description of the collection. 
+            # Description of the collection table. 
             # If not provided, then the description will be 'created by {user} on {creation_time}'.
             clean_conf['collection_description'] = config[section].get('collection_description', None)
-            # Add src as collection table meta field
-            clean_conf['src_as_meta'] = config[section].getboolean('src_as_meta', True)
+            #
+            # Description of the collection metadata table. 
+            # If not provided, then the description will be 'created by {user} on {creation_time}'.
+            clean_conf['metadata_description'] = config[section].get('metadata_description', None)
+            #
+            # Add information about document's location in the original vert file to the metadata table. 
+            # This adds columns ('_vert_file', '_vert_doc_id', '_vert_doc_start_line', '_vert_doc_end_line') to 
+            # the collection metadata table.
+            clean_conf['add_vert_indexing_info'] = config[section].getboolean('add_vert_indexing_info', True)
+            #
+            # Add src as a meta field of the collection base table 
+            clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf

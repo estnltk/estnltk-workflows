@@ -72,7 +72,7 @@ if len(sys.argv) > 1:
                     storage.delete_collection(collection_name)
             
             # Add new collection
-            meta = {'src': 'str'} if configuration['src_as_meta'] else None
+            meta = {'src': 'str'} if configuration['add_src_as_meta'] else None
             storage.add_collection( collection_name, description=collection_description, meta=meta )
 
             # Create collection layer tables
