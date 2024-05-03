@@ -24,6 +24,9 @@ from x_db_utils import create_collection_layer_tables
 from x_db_utils import create_collection_metadata_table
 from x_db_utils import metadata_table_exists
 from x_db_utils import drop_collection_metadata_table
+from x_db_utils import sentence_hash_table_exists
+from x_db_utils import create_sentence_hash_table
+from x_db_utils import drop_sentence_hash_table
 
 # Overwrite existing collection
 overwrite_existing = False
@@ -69,6 +72,8 @@ if len(sys.argv) > 1:
                     collection = storage[collection_name]
                     if metadata_table_exists(collection):
                         drop_collection_metadata_table(collection)
+                    if sentence_hash_table_exists(collection):
+                        drop_sentence_hash_table(collection)
                     storage.delete_collection(collection_name)
             
             # Add new collection
@@ -78,6 +83,9 @@ if len(sys.argv) > 1:
             # Create collection layer tables
             collection = storage[collection_name]
             create_collection_layer_tables(configuration, collection)
+            
+            # Create collection's sentences hash table
+            create_sentence_hash_table(configuration, collection)
             
             # Create collection metadata table
             create_collection_metadata_table(configuration, collection)

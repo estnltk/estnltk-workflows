@@ -25,6 +25,10 @@ from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
 
 
+# ===================================================================
+#    Collection's layer tables
+# ===================================================================
+
 def create_collection_layer_tables( configuration: dict, collection: 'pg.PgCollection', layer_type: str = 'detached' ):
     '''
     Creates layer tables to the `collection` based on layer templates loaded from collection's JSON files. 
@@ -123,6 +127,11 @@ def create_collection_layer_tables( configuration: dict, collection: 'pg.PgColle
         logger.info('{} layer {!r} created from template'.format(layer_type, template.name))
 
 
+# ===================================================================
+#  Collection's metadata table
+#  ( contains metadata from <doc>-tags in the original .vert files )
+# ===================================================================
+
 def metadata_table_name(collection_name):
     return collection_name + '__metadata'
 
@@ -208,7 +217,7 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
             if conn.status == STATUS_BEGIN:
                 # no exception, transaction in progress
                 conn.commit()
-    logger.info('created collection metadata table with fields {}'.format(new_meta_fields))
+    logger.info('created collection metadata table with meta fields {}'.format(new_meta_fields))
 
 
 def retrieve_collection_meta_fields( collection: 'pg.PgCollection', exclude_system_fields:bool=False ):
@@ -236,3 +245,85 @@ def retrieve_collection_meta_fields( collection: 'pg.PgCollection', exclude_syst
 def drop_collection_metadata_table( collection: 'pg.PgCollection', cascade: bool = False):
     metadata_table = metadata_table_name(collection.name)
     pg.drop_table(collection.storage, metadata_table)
+
+
+# ===================================================================
+#  Collection's sentence hash table
+#  ( contains sentences with their hash fingerprints )
+# ===================================================================
+
+def sentence_hash_table_name(collection_name, layer_name:str='sentences'):
+    return collection_name + f'__{layer_name}__hash'
+
+
+def sentence_hash_table_identifier(storage, collection_name, layer_name:str='sentences'):
+    table_name = sentence_hash_table_name(collection_name, layer_name=layer_name)
+    return pg.table_identifier(storage, table_name)
+
+
+def sentence_hash_table_exists( collection: 'pg.PgCollection', layer_name:str='sentences' ):
+    table_name = sentence_hash_table_name(collection.name, layer_name=layer_name)
+    return pg.table_exists(collection.storage, table_name, omit_commit=True, omit_rollback=True)
+
+
+def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollection', validate:bool=True ):
+    '''
+    Creates collection's sentence hash table. 
+    If `validate` is set (default), then the `configuration` is used to find the layer templates (from 
+    collection's JSON files), and it is checked that hashable layer exists in layer templates and has 
+    the required hash attribute. 
+    '''
+    layer_name = 'sentences'
+    hash_attr  = 'sha256'
+    if validate:
+        # Load layer templates
+        layer_templates = load_collection_layer_templates(configuration)
+        # Validate that hashable layer exists in the templates and has the required hash attribute
+        template_found = False
+        for layer_obj in layer_templates:
+            if layer_name in layer_obj.name and hash_attr in layer_obj.attributes:
+                template_found = True
+                # TODO: if layer_name != layer_obj.name then change layer_name to layer_obj.name (?)
+                break
+        if not template_found:
+            template_names = [layer_obj.name for layer_obj in layer_templates]
+            raise Exception(f'(!) Could not find {layer_name!r} layer with attribute {hash_attr!r} '+\
+                            f'among the layer templates {template_names!r}. Make sure add_sentence_hashes '+\
+                            'was switched on while exporting documents to JSON. ')
+    # Construct sentence hash table name/identifier
+    sentence_hash_table = sentence_hash_table_name(collection.name)
+    if sentence_hash_table_exists( collection, layer_name=layer_name ):
+        raise Exception( "The sentence hash table {!r} already exists in the collection {!r}.".format( \
+                         sentence_hash_table, collection.name) )
+    table_identifier = sentence_hash_table_identifier(collection.storage, collection.name, layer_name=layer_name)
+    # Prepare columns
+    columns = [SQL('id BIGSERIAL PRIMARY KEY'),
+               SQL('text_id INT NOT NULL'),
+               SQL('sentence_id INT NOT NULL'),
+               SQL(f'{hash_attr} TEXT')]
+    conn = collection.storage.conn
+    with conn.cursor() as cur:
+        try:
+            # Create table
+            cur.execute(SQL("CREATE TABLE {} ({});").format(table_identifier, SQL(', ').join(columns)))
+            logger.debug(cur.query.decode())
+            # Add table's comment
+            comment = Literal('created by {} on {}'.format(collection.storage.user, time.asctime()))
+            q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
+            cur.execute(q)
+            logger.debug(cur.query.decode())
+        except Exception as table_creation_error:
+            conn.rollback()
+            raise PgCollectionException("can't create sentence hash table {!r}".format(sentence_hash_table)) from table_creation_error
+        finally:
+            if conn.status == STATUS_BEGIN:
+                # no exception, transaction in progress
+                conn.commit()
+    logger.info('created collection\'s {} hash table table'.format(layer_name))
+
+
+def drop_sentence_hash_table( collection: 'pg.PgCollection', layer_name:str='sentences', \
+                              cascade: bool = False):
+    table_name = sentence_hash_table_name(collection.name, layer_name=layer_name)
+    pg.drop_table(collection.storage, table_name)
+
