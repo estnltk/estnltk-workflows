@@ -11,14 +11,22 @@ import time
 from collections import OrderedDict
 
 import psycopg2
+from psycopg2 import Error as psycopg2_Error
 from psycopg2.extensions import STATUS_BEGIN
-from psycopg2.sql import SQL, Identifier, Literal, DEFAULT
+from psycopg2.sql import DEFAULT as SQL_DEFAULT
+from psycopg2.sql import SQL, Identifier, Literal, Composed
 
 from estnltk import logger
 from estnltk.storage import postgres as pg
 from estnltk.storage.postgres import structure_table_identifier
+from estnltk.storage.postgres import collection_table_identifier
+from estnltk.storage.postgres import collection_table_name
+from estnltk.storage.postgres import layer_table_identifier
 from estnltk.storage.postgres import layer_table_exists
 from estnltk.storage.postgres import layer_table_name
+
+from estnltk.storage.postgres.context_managers.buffered_table_insert import BufferedTableInsert
+
 
 from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
@@ -327,3 +335,251 @@ def drop_sentence_hash_table( collection: 'pg.PgCollection', layer_name:str='sen
     table_name = sentence_hash_table_name(collection.name, layer_name=layer_name)
     pg.drop_table(collection.storage, table_name, cascade=cascade)
 
+
+# ===================================================================
+#    Buffered insertion into all tables of the collection
+# ===================================================================
+
+
+class BufferedMultiTableInsert():
+    '''Buffered inserter that maintains insertion buffers over multiple tables.
+    
+       Builds upon: 
+       https://github.com/estnltk/estnltk/blob/main/estnltk/estnltk/storage/postgres/context_managers/buffered_table_insert.py
+       https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/buffered_table_insert.py 
+    '''
+
+    def __init__(self, storage, tables_columns, buffer_size=10000, query_length_limit=5000000):
+        """Initializes context manager for buffered insertions.
+        
+        Parameters:
+        
+        :param storage: pg.PostgresStorage
+            Postgres Storage into which insertions will be made.
+        :param tables_columns:  List[Tuple[str, psycopg2.sql.SQL, List[str]]]
+            List with table names, SQL identifiers and corresponding table column
+            names into which insertions will be made. 
+            Note: tables must already exist when the BufferedMultiTableInsert 
+            object is created.
+        :param buffer_size: int
+            Maximum buffer size (in table rows) for the insert query. 
+            If the insertion buffer of any of the tables meets or exceeds this 
+            size, then the insert buffer will be flushed. 
+            (Default: 10000)
+        :param query_length_limit: int
+            Soft approximate insert query length limit in unicode characters. 
+            If the limit is met or exceeded, the insert buffer will be flushed.
+            (Default: 5000000)
+        """
+        self.conn = storage.conn
+        self.storage = storage
+        self.tables_columns = OrderedDict()
+        for items in tables_columns:
+            assert len(items) == 3, f'(!) Unexpected values {items!r} for tables_columns row. '+\
+                                    'Expected: [table_name:str, SQL_table_identifier:Union[SQL,Composed], list_of_column_names:List[str]]'
+            assert isinstance(items[0], str), \
+                f'(!) Unexpected type {type(items[0])} for table_name: str'
+            table_name = items[0]
+            # Check for the existence of the table
+            if not pg.table_exists( storage, table_name, omit_commit=True, omit_rollback=True ):
+                raise ValueError(f'(!) Table {table_name!r} does not exist. '+\
+                                  'Please use script "d_create_collection_tables.py" to create '+\
+                                  'tables of the collection.')
+            assert isinstance(items[1], (SQL, Composed)), \
+                f'(!) Unexpected type {type(items[1])} for SQL_table_identifier: Union[SQL,Composed].'
+            table_sql_id = items[1]
+            assert isinstance(items[2], list), \
+                f'(!) Unexpected type {type(items[2])} for list_of_column_names: List[str]'
+            column_identifiers = SQL(', ').join(map(Identifier, items[2]))
+            self.tables_columns[table_name] = (table_sql_id, column_identifiers)
+        self.buffer_size = buffer_size
+        self.query_length_limit = query_length_limit
+        # Make new cursor for the insertion
+        self.cursor = self.conn.cursor()
+        # Initialize buffers -- each table has its own buffer
+        self._buffered_insert_query_length = 0
+        self.table_buffer = {}
+        for table in self.tables_columns.keys():
+            self.table_buffer[table] = []
+            column_identifiers = self.tables_columns[table][1]
+            self._buffered_insert_query_length += BufferedTableInsert.get_query_length(column_identifiers)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        '''Flushes the buffer and closes this insertion manager. 
+           If you are initializing BufferedMultiTableInsert 
+           outside the with statement, you should call this method 
+           after all insertions have been done.'''
+        # Final flushing of the buffer
+        self._flush_insert_buffer()
+        if self.cursor is not None:
+            # Close the cursor
+            self.cursor.close()
+
+    def insert(self, table_name, values):
+        """Inserts given values into the table via buffer. 
+           Before the insertion, all values will be converted to 
+           literals.
+           Exceptionally, a value can also be psycopg2.sql.DEFAULT, 
+           in which case it will not be converted.
+           Note: this method assumes that the table, where values
+           will be inserted, has already been created.
+        """
+        assert self.cursor is not None
+        assert self.conn.autocommit == False
+        if table_name not in self.tables_columns.keys():
+            raise KeyError(f'(!) Unexpected table {table_name!r}: no instructions '+\
+                           'available on how to insert into that table.')
+        # Convert values to literals
+        converted = []
+        for val in values:
+            if val == SQL_DEFAULT:
+                # Skip value that has already been converted
+                converted.append( val )
+            else:
+                converted.append( Literal(val) )
+        q_vals = SQL('({})').format(SQL(', ').join( converted ))
+        # Find out how much the query length and the buffer size will increase
+        added_query_length = BufferedTableInsert.get_query_length( q_vals )
+        cur_buffer = self.table_buffer[table_name]
+        # Do we need to flush the buffer before appending?
+        if len(cur_buffer) + 1 >= self.buffer_size or \
+           self._buffered_insert_query_length + added_query_length >= self.query_length_limit:
+            self._flush_insert_buffer()
+        # Add to the buffer
+        sself.table_buffer[table_name].append( q_vals )
+        self._buffered_insert_query_length += added_query_length
+
+    def has_unflushed_buffers(self):
+        return any([ len(self.table_buffer[k]) > 0 for k in self.table_buffer.keys() ])
+
+    def _flush_insert_buffer(self):
+        """Flushes the insert buffer, i.e. attempts to execute and commit 
+           insert queries of all the tables.
+        """
+        if not self.has_unflushed_buffers():
+            return
+        # Flush buffers of all tables
+        rows_flushed = 0
+        bytes_flushed = 0
+        for table in self.tables_columns.keys():
+            table_identifier = self.tables_columns[table][0]
+            column_identifiers = self.tables_columns[table][1]
+            buffer = self.table_buffer[table]
+            if len( buffer ) > 0:
+                try:
+                    self.cursor.execute(SQL('INSERT INTO {} ({}) VALUES {};').format(
+                                   table_identifier,
+                                   column_identifiers,
+                                   SQL(', ').join(buffer)))
+                    rows_flushed += len(buffer)
+                    bytes_flushed += len(self.cursor.query)
+                except Exception as ex:
+                    if issubclass(type(ex), psycopg2_Error):
+                        # Log more information about psycopg2_Error
+                        if ex.diag.message_primary is not None:
+                            logger.error('{}: {}'.format( ex.__class__.__name__, \
+                                                          ex.diag.message_primary ))
+                        if ex.diag.message_detail is not None:
+                            logger.error('DETAIL: {}'.format( ex.diag.message_detail ))
+                        if ex.diag.message_hint is not None:
+                            logger.error('HINT: {}'.format( ex.diag.message_hint ))
+                        if ex.diag.context is not None:
+                            logger.error('CONTEXT: {}'.format( ex.diag.context ))
+                    logger.error(f'flush insert buffer failed at table {table}')
+                    if rows_flushed > 0:
+                        logger.error('number of rows inserted: {}'.format(rows_flushed))
+                    logger.error('number of rows still in the buffer: {}'.format(len(buffer)))
+                    logger.error('estimated total insert query length: {}'.format(self._buffered_insert_query_length))
+                    self.cursor.connection.rollback()
+                    raise
+                finally:
+                    if self.cursor.connection.status == STATUS_BEGIN:
+                        # no exception, transaction in progress
+                        self.cursor.connection.commit()
+        # Log progress
+        logger.debug('flush buffer: {} rows, {} bytes, {} estimated characters'.format(
+                     rows_flushed, bytes_flushed, self._buffered_insert_query_length))
+        # Clear / reset buffer
+        self._buffered_insert_query_length = 0
+        for table in self.tables_columns.keys():
+            self.table_buffer[table].clear()
+            column_identifiers = self.tables_columns[table][1]
+            self._buffered_insert_query_length += BufferedTableInsert.get_query_length(column_identifiers)
+
+
+
+
+class CollectionMultiTableInserter():
+    '''A version of CollectionTextObjectInserter that allows to insert a Text object into all tables of 
+       the collection. 
+       Updates simultaneously collection base table, collection detached layer tables, metadata table, 
+       and sentences hash table.
+       ( WORK IN PROGRESS )
+    '''
+
+    def __init__(self, collection, buffer_size=10000, query_length_limit=5000000):
+        """Initializes context manager for Text object insertions.
+        
+        Parameters:
+         
+        :param collection: PgCollection
+            Collection where Text objects will be inserted.
+        :param buffer_size: int
+            Maximum buffer size (in table rows) for the insert query. 
+            If the size is met or exceeded, the insert buffer will be flushed. 
+            (Default: 10000)
+        :param query_length_limit: int
+            Soft approximate insert query length limit in unicode characters. 
+            If the limit is met or exceeded, the insert buffer will be flushed.
+            (Default: 5000000)
+        """
+        self.collection = collection
+        self.buffer_size = buffer_size
+        self.query_length_limit = query_length_limit
+        insertable_tables = []
+        # Collection table
+        collection_table = collection_table_name(self.collection.name)
+        collection_identifier = collection_table_identifier( self.collection.storage, self.collection.name )
+        collection_table_columns = self.collection.column_names
+        insertable_tables.append( [collection_table, collection_identifier, collection_table_columns] )
+        # Layer tables
+        layers = list(self.collection.structure)
+        for layer_name in layers:
+            layer_table = layer_table_name(collection.name, layer_name)
+            table_identifier = \
+                layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
+            insertable_tables.append( [layer_table, table_identifier, ["id", "text_id", "data"]] )
+        # Metadata table
+        metadata_table     = metadata_table_name(self.collection.name)
+        meta_identifier    = metadata_table_identifier(self.collection.storage, self.collection.name)
+        meta_table_columns_and_types = \
+            retrieve_collection_meta_fields(self.collection, exclude_system_fields=False)
+        meta_table_columns = [col for col in meta_table_columns_and_types.keys()]
+        insertable_tables.append( [metadata_table, meta_identifier, meta_table_columns] )
+        # Sentence hash table
+        sentences_layer = 'sentences'
+        hash_attr = 'sha256'
+        sentence_hash_table = sentence_hash_table_name(self.collection.name, \
+                                                       layer_name=sentences_layer)
+        sentence_hash_id    = sentence_hash_table_identifier(self.collection.storage, \
+                                                             self.collection.name, \
+                                                             layer_name=sentences_layer)
+        sentence_hash_columns = ['id', 'text_id', 'sentence_id', f'{hash_attr}']
+        insertable_tables.append( [sentence_hash_table, sentence_hash_id, sentence_hash_columns] )
+        # Make mapping from table names to expected columns
+        self.tables_to_columns = OrderedDict()
+        for items in insertable_tables:
+            self.tables_to_columns[items[0]] = items[2]
+        # Create buffered inserter. TODO: relocate this to __enter__ block
+        self.buffered_inserter = BufferedMultiTableInsert( self.collection.storage, 
+                                                           insertable_tables,
+                                                           query_length_limit = self.query_length_limit,
+                                                           buffer_size = self.buffer_size )
+    
+    # TODO: complete this class
