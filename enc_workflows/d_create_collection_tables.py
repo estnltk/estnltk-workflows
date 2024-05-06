@@ -1,6 +1,5 @@
 #
-#   Creates Postgres database tables for given collection.
-#   ( work in progress )
+#   Creates Postgres database tables for the given collection.
 #   
 #   Requires name of a configuration INI file as an input argument. 
 #   
@@ -64,7 +63,7 @@ if len(sys.argv) > 1:
                 if not overwrite_existing:
                     storage_exists_error_msg = \
                         f'(!) Collection {collection_name!r} already exists in the database. '+\
-                        f'Use flag -w to remove the existing collection and start from the scratch.'
+                        f'Use flag -r to remove the existing collection and start from the scratch.'
                     logger.error( storage_exists_error_msg )
                     raise Exception(storage_exists_error_msg)
                 else:
