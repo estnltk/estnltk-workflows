@@ -16,7 +16,11 @@ from psycopg2.extensions import STATUS_BEGIN
 from psycopg2.sql import DEFAULT as SQL_DEFAULT
 from psycopg2.sql import SQL, Identifier, Literal, Composed
 
+from estnltk import Text
 from estnltk import logger
+from estnltk.converters import text_to_json
+from estnltk.converters import layer_to_json
+
 from estnltk.storage import postgres as pg
 from estnltk.storage.postgres import structure_table_identifier
 from estnltk.storage.postgres import collection_table_identifier
@@ -30,6 +34,7 @@ from estnltk.storage.postgres.context_managers.buffered_table_insert import Buff
 
 from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
+from x_utils import normalize_src
 
 
 # ===================================================================
@@ -435,6 +440,7 @@ class BufferedMultiTableInsert():
         if table_name not in self.tables_columns.keys():
             raise KeyError(f'(!) Unexpected table {table_name!r}: no instructions '+\
                            'available on how to insert into that table.')
+        columns = self.tables_columns[table_name][1]
         # Convert values to literals
         converted = []
         for val in values:
@@ -443,6 +449,8 @@ class BufferedMultiTableInsert():
                 converted.append( val )
             else:
                 converted.append( Literal(val) )
+        assert len( converted ) == len( columns ), \
+            f'(!) Number of insertable values: {len(values)} != number of table {table_name!r} columns: {len(columns)}'
         q_vals = SQL('({})').format(SQL(', ').join( converted ))
         # Find out how much the query length and the buffer size will increase
         added_query_length = BufferedTableInsert.get_query_length( q_vals )
@@ -520,6 +528,11 @@ class CollectionMultiTableInserter():
        the collection. 
        Updates simultaneously collection base table, collection detached layer tables, metadata table, 
        and sentences hash table.
+       
+       Builds upon: 
+       https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/collection_text_object_inserter.py
+       https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/collection_detached_layer_inserter.py
+       
        ( WORK IN PROGRESS )
     '''
 
@@ -542,19 +555,15 @@ class CollectionMultiTableInserter():
         self.collection = collection
         self.buffer_size = buffer_size
         self.query_length_limit = query_length_limit
+        # Make mapping from insertion phases to table names and columns
+        self.insertion_phase_map = OrderedDict()
         insertable_tables = []
         # Collection table
         collection_table = collection_table_name(self.collection.name)
         collection_identifier = collection_table_identifier( self.collection.storage, self.collection.name )
         collection_table_columns = self.collection.column_names
         insertable_tables.append( [collection_table, collection_identifier, collection_table_columns] )
-        # Layer tables
-        layers = list(self.collection.structure)
-        for layer_name in layers:
-            layer_table = layer_table_name(collection.name, layer_name)
-            table_identifier = \
-                layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
-            insertable_tables.append( [layer_table, table_identifier, ["id", "text_id", "data"]] )
+        self.insertion_phase_map['_collection'] = (collection_table, collection_table_columns)
         # Metadata table
         metadata_table     = metadata_table_name(self.collection.name)
         meta_identifier    = metadata_table_identifier(self.collection.storage, self.collection.name)
@@ -562,6 +571,15 @@ class CollectionMultiTableInserter():
             retrieve_collection_meta_fields(self.collection, exclude_system_fields=False)
         meta_table_columns = [col for col in meta_table_columns_and_types.keys()]
         insertable_tables.append( [metadata_table, meta_identifier, meta_table_columns] )
+        self.insertion_phase_map['_metadata'] = (metadata_table, insertable_tables[-1][-1]) 
+        # Layer tables
+        layers = list(self.collection.structure)
+        for layer_name in layers:
+            layer_table = layer_table_name(collection.name, layer_name)
+            table_identifier = \
+                layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
+            insertable_tables.append( [layer_table, table_identifier, ["id", "text_id", "data"]] )
+            self.insertion_phase_map[f'_layer_{layer_name}'] = (layer_table, insertable_tables[-1][-1])
         # Sentence hash table
         sentences_layer = 'sentences'
         hash_attr = 'sha256'
@@ -572,14 +590,136 @@ class CollectionMultiTableInserter():
                                                              layer_name=sentences_layer)
         sentence_hash_columns = ['id', 'text_id', 'sentence_id', f'{hash_attr}']
         insertable_tables.append( [sentence_hash_table, sentence_hash_id, sentence_hash_columns] )
-        # Make mapping from table names to expected columns
-        self.tables_to_columns = OrderedDict()
-        for items in insertable_tables:
-            self.tables_to_columns[items[0]] = items[2]
-        # Create buffered inserter. TODO: relocate this to __enter__ block
+        self.insertion_phase_map['_hashes'] = (sentence_hash_table, insertable_tables[-1][-1])
+        self.insertable_tables = insertable_tables
+        self.buffered_inserter = None
+        self.text_insert_counter = 0
+        # TODO: count complete vs incomplete insertions
+
+
+    def __enter__(self):
+        """ Initializes the insertion buffer. Assumes collection structure & tables have already been created. """
+        self.collection.storage.conn.commit()
+        self.collection.storage.conn.autocommit = False
+        assert self.insertable_tables is not None and len(self.insertable_tables) > 0
+        # Make new buffered inserter
         self.buffered_inserter = BufferedMultiTableInsert( self.collection.storage, 
-                                                           insertable_tables,
+                                                           self.insertable_tables,
                                                            query_length_limit = self.query_length_limit,
                                                            buffer_size = self.buffer_size )
-    
-    # TODO: complete this class
+        cursor = self.buffered_inserter.cursor
+        assert cursor is not None
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """ Closes the insertion buffer. """
+        if self.buffered_inserter is not None:
+            self.buffered_inserter.close()
+            logger.info('inserted {} texts into the collection {!r}'.format(self.text_insert_counter, self.collection.name))
+
+    def __call__(self, text, key): 
+        self.insert(text, key=key)
+
+
+    def insert(self, text, key):
+        """Inserts given Text object with the given key into the collection.
+           Optionally, metadata of the insertable Text object can be specified. 
+        """
+        assert self.buffered_inserter is not None
+        #
+        # Divide Text obj insertion into different phases
+        #
+        for phase in self.insertion_phase_map.keys():
+            table_name    = self.insertion_phase_map[phase][0]
+            table_columns = self.insertion_phase_map[phase][1]
+            if phase == '_collection':
+                # Insert Text object without annotations and metadata
+                new_text_meta = None
+                new_text, new_text_meta = CollectionMultiTableInserter._insertable_text_object(text, add_src=True)
+                row = [ key, text_to_json(new_text) ]
+                for k in self.collection.column_names[2:]:
+                    if new_text_meta is None:
+                        raise ValueError(('(!) Metadata columns exist, but meta_data is None. '+\
+                                          'Please use meta_data={} if you want to leave metadata columns empty.'))
+                    if k in new_text_meta:
+                        m = new_text_meta[k]
+                    else:
+                        m = SQL_DEFAULT
+                    row.append(m)
+                assert len(table_columns) == len(row)
+                self.buffered_inserter.insert( table_name, row )
+            elif phase == '_metadata':
+                # Insert Text's metadata
+                row = [ SQL_DEFAULT, key ]
+                new_text_meta = CollectionMultiTableInserter._insertable_metadata(text, table_columns)
+                row.extend(new_text_meta)
+                assert len(table_columns) == len(row)
+                self.buffered_inserter.insert( table_name, row )
+            elif phase.startswith('_layer_'):
+                # Insert Text's layer
+                # TODO: remove hash attr of the sentence layer
+                layer_name = phase[7:]
+                assert layer_name in text.layers, \
+                    f'(!) Text object is missing insertable layer {layer_name!r}. Available layers: {text.layers}'
+                row = [ SQL_DEFAULT, key, layer_to_json(text[layer_name]) ]
+                assert len(table_columns) == len(row)
+                self.buffered_inserter.insert( table_name, row )
+            elif phase == '_hashes':
+                # Insert Text's sentence hashes
+                sent_hashes = CollectionMultiTableInserter._insertable_hashes(text, layer='sentences', hash_attr='sha256')
+                rows = []
+                for [sent_id, sent_hash] in sent_hashes:
+                    rows.append(SQL_DEFAULT, key, sent_id, sent_hash)
+                assert len(table_columns) == len(row)
+                self.buffered_inserter.insert( table_name, row )
+            else:
+                raise NotImplementedError(f'(!) Unimplemented phase: {phase!r}')
+        # Mark document insertion completed
+        self.text_insert_counter += 1
+
+
+    @staticmethod 
+    def _insertable_text_object( text, add_src=True ):
+        # Make new insertable Text that does not have any metadata
+        assert isinstance(text, Text)
+        new_text = Text(text.text)
+        if add_src:
+            new_text.meta['src'] = normalize_src((text.meta).get('src', None))
+        return new_text, new_text.meta if add_src else new_text
+
+    @staticmethod
+    def _insertable_metadata( text, metadata_columns ):
+        # Extract metadata of the document
+        new_meta = {}
+        for mid, meta_key in enumerate(metadata_columns):
+            if meta_key in ['id', 'text_id']:
+                continue
+            elif meta_key == '_vert_file':
+                new_meta['_vert_file'] = \
+                    (text.meta).get("_doc_vert_file", SQL_DEFAULT)
+            elif meta_key == '_vert_doc_id':
+                new_meta['_vert_doc_id'] = \
+                    (text.meta).get("_doc_id", SQL_DEFAULT)
+            elif meta_key == '_vert_doc_start_line':
+                new_meta['_vert_doc_start_line'] = \
+                    (text.meta).get("_doc_start_line", SQL_DEFAULT)
+            elif meta_key == '_vert_doc_end_line':
+                new_meta['_vert_doc_end_line'] = \
+                    (text.meta).get("_doc_end_line", SQL_DEFAULT)
+            else:
+                new_meta[meta_key] = (text.meta).get(meta_key, SQL_DEFAULT)
+        return new_meta
+
+    @staticmethod
+    def _insertable_hashes( text, layer='sentences', hash_attr='sha256' ):
+        # Extract sentence hashes of the document
+        assert layer in text.layers
+        assert hash_attr in text[layer].attributes, \
+            f'(!) Text layer\'s {layer!r} is missing hash attribute {hash_attr!r}'
+        sentence_hashes = []
+        for sent_id, sentence in enumerate( text[layer] ):
+            sent_hash = sentence.annotations[0][hash_attr]
+            assert isinstance(sent_hash, str)
+            sentence_hashes.append( [sent_id, sent_hash] )
+        return sentence_hashes
+
