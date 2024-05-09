@@ -175,7 +175,7 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             # Remove sentence_hash attribute from sentence Layer objects. Note that even after the removal, 
             # sentence hash information is still stored in the sentences hash table, only sentence Layer 
             # objects do not have their hash fingerprints explicitly marked.
-            clean_conf['remove_sentences_hash_attr'] = config[section].getboolean('remove_sentences_hash_attr', False)
+            clean_conf['remove_sentences_hash_attr'] = config[section].getboolean('remove_sentences_hash_attr', True)
             #
             # Add src as a meta field of the collection base table 
             clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)

@@ -453,7 +453,7 @@ class SentenceHashRemover(Retagger):
     """Removes a hash fingerprints from each sentence. 
        Before inserting sentence annotation to the database, fingerprints need to be removed."""
     
-    conf_param = []
+    conf_param = ['attrib']
     
     def __init__(self, output_layer:str='sentences', attrib:str='sha256'):
         self.attrib = attrib
