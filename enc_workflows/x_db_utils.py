@@ -35,6 +35,7 @@ from estnltk.storage.postgres.context_managers.buffered_table_insert import Buff
 from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
 from x_utils import normalize_src
+from x_utils import SentenceHashRemover
 
 
 # ===================================================================
@@ -536,7 +537,9 @@ class CollectionMultiTableInserter():
        ( WORK IN PROGRESS )
     '''
 
-    def __init__(self, collection, buffer_size=10000, query_length_limit=5000000):
+    def __init__(self, collection, buffer_size=10000, query_length_limit=5000000, 
+                       remove_sentences_hash_attr=False, sentences_layer='sentences', 
+                       sentences_hash_attr='sha256' ):
         """Initializes context manager for Text object insertions.
         
         Parameters:
@@ -551,6 +554,17 @@ class CollectionMultiTableInserter():
             Soft approximate insert query length limit in unicode characters. 
             If the limit is met or exceeded, the insert buffer will be flushed.
             (Default: 5000000)
+        :param remove_sentences_hash_attr: bool
+            Whether `sentences_hash_attr` will be removed from `sentences_layer` 
+            before inserting the layer into the layer table.
+            Default: False
+        :param sentences_layer: str
+            Name of the sentences layer which also contains hash fingerprints 
+            in the layer attribute `sentences_hash_attr`.
+            Default: 'sentences'
+        :param sentences_hash_attr: str
+            Name of the hash fingerprint attribute in the `sentences_layer`.
+            Default: 'sha256'
         """
         self.collection = collection
         self.buffer_size = buffer_size
@@ -564,6 +578,9 @@ class CollectionMultiTableInserter():
         collection_table_columns = self.collection.column_names
         insertable_tables.append( [collection_table, collection_identifier, collection_table_columns] )
         self.insertion_phase_map['_collection'] = (collection_table, collection_table_columns)
+        self.add_meta_src  = 'src' in (self.collection).meta.columns
+        assert len((self.collection).meta.columns) <= 1, \
+            f'(!) Unexpected meta columns in collection: {(self.collection).meta.columns!r}'
         # Metadata table
         metadata_table     = metadata_table_name(self.collection.name)
         meta_identifier    = metadata_table_identifier(self.collection.storage, self.collection.name)
@@ -572,6 +589,23 @@ class CollectionMultiTableInserter():
         meta_table_columns = [col for col in meta_table_columns_and_types.keys()]
         insertable_tables.append( [metadata_table, meta_identifier, meta_table_columns] )
         self.insertion_phase_map['_metadata'] = (metadata_table, insertable_tables[-1][-1]) 
+        # Sentence hash table
+        # (must come before layer insertion because sentence hashes can be removed during layer insertion)
+        self.sentences_layer = sentences_layer
+        self.sentences_hash_attr = sentences_hash_attr
+        self.remove_sentences_hash_attr = remove_sentences_hash_attr
+        self.sentences_hash_remover = None
+        if self.remove_sentences_hash_attr:
+            self.sentences_hash_remover = SentenceHashRemover( output_layer=self.sentences_layer, \
+                                                               attrib = self.sentences_hash_attr )
+        sentence_hash_table = sentence_hash_table_name(self.collection.name, \
+                                                       layer_name=self.sentences_layer)
+        sentence_hash_id    = sentence_hash_table_identifier(self.collection.storage, \
+                                                             self.collection.name, \
+                                                             layer_name=self.sentences_layer)
+        sentence_hash_columns = ['id', 'text_id', 'sentence_id', f'{self.sentences_hash_attr}']
+        insertable_tables.append( [sentence_hash_table, sentence_hash_id, sentence_hash_columns] )
+        self.insertion_phase_map['_hashes'] = (sentence_hash_table, insertable_tables[-1][-1])
         # Layer tables
         layers = list(self.collection.structure)
         for layer_name in layers:
@@ -580,17 +614,6 @@ class CollectionMultiTableInserter():
                 layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
             insertable_tables.append( [layer_table, table_identifier, ["id", "text_id", "data"]] )
             self.insertion_phase_map[f'_layer_{layer_name}'] = (layer_table, insertable_tables[-1][-1])
-        # Sentence hash table
-        sentences_layer = 'sentences'
-        hash_attr = 'sha256'
-        sentence_hash_table = sentence_hash_table_name(self.collection.name, \
-                                                       layer_name=sentences_layer)
-        sentence_hash_id    = sentence_hash_table_identifier(self.collection.storage, \
-                                                             self.collection.name, \
-                                                             layer_name=sentences_layer)
-        sentence_hash_columns = ['id', 'text_id', 'sentence_id', f'{hash_attr}']
-        insertable_tables.append( [sentence_hash_table, sentence_hash_id, sentence_hash_columns] )
-        self.insertion_phase_map['_hashes'] = (sentence_hash_table, insertable_tables[-1][-1])
         self.insertable_tables = insertable_tables
         self.buffered_inserter = None
         self.text_insert_counter = 0
@@ -635,17 +658,14 @@ class CollectionMultiTableInserter():
             if phase == '_collection':
                 # Insert Text object without annotations and metadata
                 new_text_meta = None
-                new_text, new_text_meta = CollectionMultiTableInserter._insertable_text_object(text, add_src=True)
-                row = [ key, text_to_json(new_text) ]
-                for k in self.collection.column_names[2:]:
-                    if new_text_meta is None:
-                        raise ValueError(('(!) Metadata columns exist, but meta_data is None. '+\
-                                          'Please use meta_data={} if you want to leave metadata columns empty.'))
-                    if k in new_text_meta:
-                        m = new_text_meta[k]
-                    else:
-                        m = SQL_DEFAULT
-                    row.append(m)
+                if self.add_meta_src:
+                    new_text, new_text_meta = \
+                        CollectionMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
+                    row = [ key, text_to_json(new_text), new_text_meta.get('src', SQL_DEFAULT) ]
+                else:
+                    new_text = \
+                        CollectionMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
+                    row = [ key, text_to_json(new_text) ]
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
             elif phase == '_metadata':
@@ -655,21 +675,25 @@ class CollectionMultiTableInserter():
                 row.extend(new_text_meta)
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
+            elif phase == '_hashes':
+                # Insert Text's sentence hashes
+                sent_hashes = CollectionMultiTableInserter._insertable_hashes(text, 
+                                                                              layer=self.sentences_layer, 
+                                                                              hash_attr=self.sentences_hash_attr)
+                for [sent_id, sent_hash] in sent_hashes:
+                    row = [SQL_DEFAULT, key, sent_id, sent_hash]
+                    assert len(table_columns) == len(row)
+                    self.buffered_inserter.insert( table_name, row )
             elif phase.startswith('_layer_'):
                 # Insert Text's layer
-                # TODO: remove hash attr of the sentence layer
                 layer_name = phase[7:]
                 assert layer_name in text.layers, \
                     f'(!) Text object is missing insertable layer {layer_name!r}. Available layers: {text.layers}'
+                if self.remove_sentences_hash_attr and layer_name == self.sentences_layer:
+                    # Remove hash attribute from the sentences layer
+                    self.sentences_hash_remover.retag(text)
+                    assert self.sentences_hash_attr not in text[layer_name]
                 row = [ SQL_DEFAULT, key, layer_to_json(text[layer_name]) ]
-                assert len(table_columns) == len(row)
-                self.buffered_inserter.insert( table_name, row )
-            elif phase == '_hashes':
-                # Insert Text's sentence hashes
-                sent_hashes = CollectionMultiTableInserter._insertable_hashes(text, layer='sentences', hash_attr='sha256')
-                rows = []
-                for [sent_id, sent_hash] in sent_hashes:
-                    rows.append(SQL_DEFAULT, key, sent_id, sent_hash)
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
             else:
