@@ -405,7 +405,7 @@ class BufferedMultiTableInsert():
             assert isinstance(items[2], list), \
                 f'(!) Unexpected type {type(items[2])} for list_of_column_names: List[str]'
             column_identifiers = SQL(', ').join(map(Identifier, items[2]))
-            self.tables_columns[table_name] = (table_sql_id, column_identifiers)
+            self.tables_columns[table_name] = (table_sql_id, column_identifiers, items[2])
         self.buffer_size = buffer_size
         self.query_length_limit = query_length_limit
         # Make new cursor for the insertion
@@ -449,7 +449,9 @@ class BufferedMultiTableInsert():
         if table_name not in self.tables_columns.keys():
             raise KeyError(f'(!) Unexpected table {table_name!r}: no instructions '+\
                            'available on how to insert into that table.')
-        columns = self.tables_columns[table_name][1]
+        column_names = self.tables_columns[table_name][2]
+        assert len( values ) == len( column_names ), \
+            f'(!) Number of insertable values: {len(values)} != number of table {table_name!r} columns: {len(column_names)}'
         # Convert values to literals
         converted = []
         for val in values:
@@ -458,8 +460,6 @@ class BufferedMultiTableInsert():
                 converted.append( val )
             else:
                 converted.append( Literal(val) )
-        assert len( converted ) == len( columns ), \
-            f'(!) Number of insertable values: {len(values)} != number of table {table_name!r} columns: {len(columns)}'
         q_vals = SQL('({})').format(SQL(', ').join( converted ))
         # Find out how much the query length and the buffer size will increase
         added_query_length = BufferedTableInsert.get_query_length( q_vals )
@@ -469,7 +469,7 @@ class BufferedMultiTableInsert():
            self._buffered_insert_query_length + added_query_length >= self.query_length_limit:
             self._flush_insert_buffer()
         # Add to the buffer
-        sself.table_buffer[table_name].append( q_vals )
+        self.table_buffer[table_name].append( q_vals )
         self._buffered_insert_query_length += added_query_length
 
     def has_unflushed_buffers(self):
@@ -575,6 +575,9 @@ class CollectionMultiTableInserter():
             Default: 'sha256'
         """
         self.collection = collection
+        if self.collection.version < '4.0':
+            raise Exception( ("Cannot use this CollectionMultiTableInserter with collection version {!r}. "+\
+                              "PgCollection version 4.0+ is required.").format(self.collection.version) )
         self.buffer_size = buffer_size
         self.query_length_limit = query_length_limit
         # Make mapping from insertion phases to table names and columns
@@ -669,11 +672,11 @@ class CollectionMultiTableInserter():
                 if self.add_meta_src:
                     new_text, new_text_meta = \
                         CollectionMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
-                    row = [ key, text_to_json(new_text), new_text_meta.get('src', SQL_DEFAULT) ]
+                    row = [ key, text_to_json(new_text), False, new_text_meta.get('src', SQL_DEFAULT) ]
                 else:
                     new_text = \
                         CollectionMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
-                    row = [ key, text_to_json(new_text) ]
+                    row = [ key, text_to_json(new_text), False ]
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
             elif phase == '_metadata':
@@ -720,27 +723,25 @@ class CollectionMultiTableInserter():
         return new_text, new_text.meta if add_src else new_text
 
     @staticmethod
-    def _insertable_metadata( text, metadata_columns ):
+    def _insertable_metadata( text, metadata_columns, initial_id='initial_id' ):
         # Extract metadata of the document
-        new_meta = {}
+        text_meta = []
         for mid, meta_key in enumerate(metadata_columns):
             if meta_key in ['id', 'text_id']:
                 continue
+            elif meta_key == initial_id:
+                text_meta.append( (text.meta).get("id", SQL_DEFAULT) )
             elif meta_key == '_vert_file':
-                new_meta['_vert_file'] = \
-                    (text.meta).get("_doc_vert_file", SQL_DEFAULT)
+                text_meta.append( (text.meta).get("_doc_vert_file", SQL_DEFAULT) )
             elif meta_key == '_vert_doc_id':
-                new_meta['_vert_doc_id'] = \
-                    (text.meta).get("_doc_id", SQL_DEFAULT)
+                text_meta.append( (text.meta).get("_doc_id", SQL_DEFAULT) )
             elif meta_key == '_vert_doc_start_line':
-                new_meta['_vert_doc_start_line'] = \
-                    (text.meta).get("_doc_start_line", SQL_DEFAULT)
+                text_meta.append( (text.meta).get("_doc_start_line", SQL_DEFAULT) )
             elif meta_key == '_vert_doc_end_line':
-                new_meta['_vert_doc_end_line'] = \
-                    (text.meta).get("_doc_end_line", SQL_DEFAULT)
+                text_meta.append( (text.meta).get("_doc_end_line", SQL_DEFAULT) )
             else:
-                new_meta[meta_key] = (text.meta).get(meta_key, SQL_DEFAULT)
-        return new_meta
+                text_meta.append( (text.meta).get(meta_key, SQL_DEFAULT) )
+        return text_meta
 
     @staticmethod
     def _insertable_hashes( text, layer='sentences', hash_attr='sha256' ):
