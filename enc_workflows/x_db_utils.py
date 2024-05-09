@@ -42,7 +42,8 @@ from x_utils import SentenceHashRemover
 #    Collection's layer tables
 # ===================================================================
 
-def create_collection_layer_tables( configuration: dict, collection: 'pg.PgCollection', layer_type: str = 'detached' ):
+def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgCollection',  layer_type: str = 'detached',
+                                    remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256' ):
     '''
     Creates layer tables to the `collection` based on layer templates loaded from collection's JSON files. 
     The `configuration` is used to find collection's subdirectories containing JSON files. 
@@ -68,9 +69,16 @@ def create_collection_layer_tables( configuration: dict, collection: 'pg.PgColle
     meta = None
     # Load layer templates
     layer_templates = load_collection_layer_templates(configuration)
-    
+
+    if remove_sentences_hash_attr:
+        # Remove hash attribute from 'sentences' layer template
+        for template in layer_templates:
+            if template.name == sentences_layer and sentences_hash_attr in template.attributes:
+                template.attributes = \
+                    tuple( [a for a in template.attributes if a != sentences_hash_attr] )
+                assert sentences_hash_attr not in template.attributes
+
     # TODO: normalize templates:
-    # * remove 'sha256' from 'sentences' ?
     # * add prefixes to layer names, e.g. 'v173_' ?
     
     # Create layer tables. Note we need to bypass the standard layer table 

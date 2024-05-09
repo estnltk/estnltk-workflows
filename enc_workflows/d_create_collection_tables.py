@@ -81,7 +81,11 @@ if len(sys.argv) > 1:
 
             # Create collection layer tables
             collection = storage[collection_name]
-            create_collection_layer_tables(configuration, collection)
+            remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+            create_collection_layer_tables(configuration, collection, 
+                                           remove_sentences_hash_attr=remove_sentences_hash_attr, 
+                                           sentences_layer='sentences', 
+                                           sentences_hash_attr='sha256' )
             
             # Create collection's sentences hash table
             create_sentence_hash_table(configuration, collection)
