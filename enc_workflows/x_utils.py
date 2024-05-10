@@ -628,3 +628,26 @@ def load_collection_layer_templates(configuration: dict):
         return templates
     else:
         raise FileNotFoundError(f'(!) No JSON documents found from collection dir {json_doc_subdir!r}')
+
+
+def rename_layer(layer: Layer, add_layer_prefix:str='', add_layer_suffix:str=''):
+    '''
+    Renames Layer by adding given prefix and suffix to its name. 
+    If layer has `parent` or is `enveloping`, then also renames 
+    those layers correspondingly.
+    Returnes renamed layer.
+    '''
+    if len(add_layer_prefix) > 0 or len(add_layer_suffix) > 0:
+        if isinstance(layer, Layer):
+            layer.name = f'{add_layer_prefix}{layer.name}{add_layer_suffix}'
+            if isinstance(layer.parent, str):
+                layer.parent = f'{add_layer_prefix}{layer.parent}{add_layer_suffix}'
+            if isinstance(layer.enveloping, str):
+                layer.enveloping = f'{add_layer_prefix}{layer.enveloping}{add_layer_suffix}'
+        else:
+            raise NotImplementedError(f'(!) Renaming {type(layer)} not implemented')
+        return layer
+    else:
+        # Nothing to do here
+        return layer
+

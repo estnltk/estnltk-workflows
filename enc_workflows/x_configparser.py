@@ -179,6 +179,22 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             #
             # Add src as a meta field of the collection base table 
             clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)
+            #
+            # Add given layer prefix to all layers in the collection.
+            # This alters both layer table names and layer json objects stored into the datbase
+            add_layer_prefix = config[section].get('add_layer_prefix', '')
+            if not isinstance(add_layer_prefix, str):
+                raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                  f'attribute add_layer_prefix be a string, not {type(add_layer_prefix)}.' )
+            clean_conf['add_layer_prefix'] = add_layer_prefix.strip()
+            #
+            # Add given layer suffix to all layers in the collection.
+            # This alters both layer table names and layer json objects stored into the datbase
+            add_layer_suffix = config[section].get('add_layer_suffix', '')
+            if not isinstance(add_layer_suffix, str):
+                raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                  f'attribute add_layer_suffix be a string, not {type(add_layer_suffix)}.' )
+            clean_conf['add_layer_suffix'] = add_layer_suffix.strip()
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf

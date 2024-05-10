@@ -44,6 +44,8 @@ if len(sys.argv) > 1:
             collection_name = configuration['collection']
             validate_database_access_parameters( configuration )
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+            add_layer_prefix = configuration['add_layer_prefix']
+            add_layer_suffix = configuration['add_layer_suffix']
             # Iterate over all vert subdirs and all document subdirs within these subdirs
             vert_subdirs = collect_collection_subdirs(configuration['collection'], only_first_level=True, full_paths=False)
             if len(vert_subdirs) == 0:
@@ -73,7 +75,9 @@ if len(sys.argv) > 1:
                                                    query_length_limit=5000000, 
                                                    remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                                    sentences_layer=sentences_layer, 
-                                                   sentences_hash_attr='sha256' ) as text_inserter:
+                                                   sentences_hash_attr='sha256', 
+                                                   add_layer_prefix=add_layer_prefix,
+                                                   add_layer_suffix=add_layer_suffix ) as text_inserter:
                     for vert_subdir in vert_subdirs:
                         # Start processing one vert_file / vert_subdir
                         subdir_start_time = datetime.now()

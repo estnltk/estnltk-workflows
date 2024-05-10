@@ -36,6 +36,7 @@ from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
 from x_utils import normalize_src
 from x_utils import SentenceHashRemover
+from x_utils import rename_layer
 
 
 # ===================================================================
@@ -78,8 +79,12 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     tuple( [a for a in template.attributes if a != sentences_hash_attr] )
                 assert sentences_hash_attr not in template.attributes
 
-    # TODO: normalize templates:
-    # * add prefixes to layer names, e.g. 'v173_' ?
+    if len(configuration['add_layer_prefix']) > 0 or \
+       len(configuration['add_layer_suffix']) > 0:
+        # Rename layers: provide prefixes/suffixes to layer names
+        for template in layer_templates:
+            rename_layer(template, add_layer_prefix=configuration['add_layer_prefix'],
+                                   add_layer_suffix=configuration['add_layer_suffix'])
     
     # Create layer tables. Note we need to bypass the standard layer table 
     # creation mechanism, which forbids layer creation on empty collection
@@ -547,7 +552,8 @@ class CollectionMultiTableInserter():
 
     def __init__(self, collection, buffer_size=10000, query_length_limit=5000000, 
                        remove_sentences_hash_attr=False, sentences_layer='sentences', 
-                       sentences_hash_attr='sha256' ):
+                       sentences_hash_attr='sha256', add_layer_prefix:str='', 
+                       add_layer_suffix:str='' ):
         """Initializes context manager for Text object insertions.
         
         Parameters:
@@ -573,6 +579,12 @@ class CollectionMultiTableInserter():
         :param sentences_hash_attr: str
             Name of the hash fingerprint attribute in the `sentences_layer`.
             Default: 'sha256'
+        :param add_layer_prefix: str
+            A string prefix to be added to layer name.
+            Default: ''
+        :param add_layer_suffix: str
+            A string suffix to be added to layer name.
+            Default: ''
         """
         self.collection = collection
         if self.collection.version < '4.0':
@@ -580,6 +592,8 @@ class CollectionMultiTableInserter():
                               "PgCollection version 4.0+ is required.").format(self.collection.version) )
         self.buffer_size = buffer_size
         self.query_length_limit = query_length_limit
+        self.add_layer_prefix = add_layer_prefix
+        self.add_layer_suffix = add_layer_suffix
         # Make mapping from insertion phases to table names and columns
         self.insertion_phase_map = OrderedDict()
         insertable_tables = []
@@ -620,6 +634,8 @@ class CollectionMultiTableInserter():
         # Layer tables
         layers = list(self.collection.structure)
         for layer_name in layers:
+            assert layer_name.startswith(self.add_layer_prefix)
+            assert layer_name.endswith(self.add_layer_suffix)
             layer_table = layer_table_name(collection.name, layer_name)
             table_identifier = \
                 layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
@@ -698,13 +714,25 @@ class CollectionMultiTableInserter():
             elif phase.startswith('_layer_'):
                 # Insert Text's layer
                 layer_name = phase[7:]
+                if len(self.add_layer_prefix) > 0:
+                    # Remove prefix from the name
+                    layer_name = layer_name[len(self.add_layer_prefix):]
+                if len(self.add_layer_suffix) > 0:
+                    # Remove suffix from the name
+                    layer_name = layer_name[:len(self.add_layer_suffix)*-1]
                 assert layer_name in text.layers, \
                     f'(!) Text object is missing insertable layer {layer_name!r}. Available layers: {text.layers}'
                 if self.remove_sentences_hash_attr and layer_name == self.sentences_layer:
                     # Remove hash attribute from the sentences layer
                     self.sentences_hash_remover.retag(text)
                     assert self.sentences_hash_attr not in text[layer_name]
-                row = [ SQL_DEFAULT, key, layer_to_json(text[layer_name]) ]
+                layer_object = text[layer_name]
+                if len(self.add_layer_prefix) > 0 or len(self.add_layer_suffix) > 0:
+                    # Rename Layer object
+                    rename_layer( layer_object, add_layer_prefix=self.add_layer_prefix, 
+                                                add_layer_suffix=self.add_layer_suffix )
+                    assert layer_object.name == phase[7:]
+                row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
             else:
