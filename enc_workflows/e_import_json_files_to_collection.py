@@ -28,7 +28,7 @@ from x_configparser import validate_database_access_parameters
 from x_db_utils import CollectionMultiTableInserter
 
 # Insert only first N documents [for debugging]
-insert_only_first = 5
+insert_only_first = -1
 
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
@@ -104,6 +104,9 @@ if len(sys.argv) > 1:
                             if len( found_doc_files ) == 0:
                                 warnings.warn( f'(!) No document json files found from {doc_subdir!r}' )
                             else:
+                                if len( found_doc_files ) > 1:
+                                    raise NotImplementedError( f'(!) Insertion of split documents not implemented. '+\
+                                                               f'Unexpectedly, multiple document files encountered in {doc_subdir!r}' )
                                 for fname in found_doc_files:
                                     fpath = os.path.join(doc_subdir, fname)
                                     text_obj = json_to_text(file = fpath)
