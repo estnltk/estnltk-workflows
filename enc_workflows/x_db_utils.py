@@ -318,6 +318,10 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
                             f'among the layer templates {template_names!r}. Make sure add_sentence_hashes '+\
                             'was switched on while exporting documents to JSON. ')
     # Construct sentence hash table name/identifier
+    if len(configuration['add_layer_prefix']) > 0 or \
+       len(configuration['add_layer_suffix']) > 0:
+        # Add prefix/suffix to layer name
+        layer_name = f'{configuration["add_layer_prefix"]}{layer_name}{configuration["add_layer_suffix"]}'
     sentence_hash_table = sentence_hash_table_name(collection.name, layer_name=layer_name )
     if sentence_hash_table_exists( collection, layer_name=layer_name ):
         raise Exception( "The sentence hash table {!r} already exists in the collection {!r}.".format( \
@@ -623,11 +627,17 @@ class CollectionMultiTableInserter():
         if self.remove_sentences_hash_attr:
             self.sentences_hash_remover = SentenceHashRemover( output_layer=self.sentences_layer, \
                                                                attrib = self.sentences_hash_attr )
+        # Construct sentence hash table name/identifier
+        sentences_name_for_hash_table = self.sentences_layer
+        if len(add_layer_prefix) > 0 or len(add_layer_suffix) > 0:
+            # Add prefix/suffix to layer name
+            sentences_name_for_hash_table = \
+                f'{add_layer_prefix}{sentences_name_for_hash_table}{add_layer_suffix}'
         sentence_hash_table = sentence_hash_table_name(self.collection.name, \
-                                                       layer_name=self.sentences_layer)
+                                                       layer_name=sentences_name_for_hash_table)
         sentence_hash_id    = sentence_hash_table_identifier(self.collection.storage, \
                                                              self.collection.name, \
-                                                             layer_name=self.sentences_layer)
+                                                             layer_name=sentences_name_for_hash_table)
         sentence_hash_columns = ['id', 'text_id', 'sentence_id', f'{self.sentences_hash_attr}']
         insertable_tables.append( [sentence_hash_table, sentence_hash_id, sentence_hash_columns] )
         self.insertion_phase_map['_hashes'] = (sentence_hash_table, insertable_tables[-1][-1])
