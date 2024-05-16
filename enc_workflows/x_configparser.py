@@ -195,6 +195,10 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
                 raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
                                   f'attribute add_layer_suffix be a string, not {type(add_layer_suffix)}.' )
             clean_conf['add_layer_suffix'] = add_layer_suffix.strip()
+            #
+            # Logging level used during the database insertion
+            clean_conf['db_insertion_log_level'] = \
+                logging.getLevelName( config[section].get('db_insertion_log_level', 'INFO') )
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf

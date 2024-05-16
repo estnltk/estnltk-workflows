@@ -26,6 +26,7 @@ from x_db_utils import drop_collection_metadata_table
 from x_db_utils import sentence_hash_table_exists
 from x_db_utils import create_sentence_hash_table
 from x_db_utils import drop_sentence_hash_table
+from x_db_utils import retrieve_collection_hash_table_names
 
 # Overwrite existing collection
 overwrite_existing = False
@@ -46,6 +47,7 @@ if len(sys.argv) > 1:
             # Get collection's parameters
             collection_name = configuration['collection']
             collection_description = configuration.get('collection_description', None)
+            logger.setLevel( configuration['db_insertion_log_level'] )
             validate_database_access_parameters( configuration )
             #print( configuration )
             # Connect to the storage
@@ -71,8 +73,12 @@ if len(sys.argv) > 1:
                     collection = storage[collection_name]
                     if metadata_table_exists(collection):
                         drop_collection_metadata_table(collection)
-                    if sentence_hash_table_exists(collection):
-                        drop_sentence_hash_table(collection)
+                    # Retrieve hash table layer names
+                    hash_table_layer_names = \
+                        retrieve_collection_hash_table_names(collection, return_layer_names=True)
+                    for layer in hash_table_layer_names:
+                        if sentence_hash_table_exists(collection, layer_name=layer):
+                            drop_sentence_hash_table(collection, layer_name=layer)
                     storage.delete_collection(collection_name)
             
             # Add new collection

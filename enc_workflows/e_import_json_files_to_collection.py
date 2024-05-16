@@ -30,6 +30,7 @@ from x_db_utils import CollectionMultiTableInserter
 # Insert only first N documents [for debugging]
 insert_only_first = -1
 
+
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
     if os.path.isfile(input_fname):
@@ -43,6 +44,7 @@ if len(sys.argv) > 1:
             # Get collection's parameters
             collection_name = configuration['collection']
             validate_database_access_parameters( configuration )
+            logger.setLevel( configuration['db_insertion_log_level'] )
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
             add_layer_prefix = configuration['add_layer_prefix']
             add_layer_suffix = configuration['add_layer_suffix']

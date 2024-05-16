@@ -293,6 +293,31 @@ def sentence_hash_table_exists( collection: 'pg.PgCollection', layer_name:str='s
     return pg.table_exists(collection.storage, table_name, omit_commit=True, omit_rollback=True)
 
 
+def retrieve_collection_hash_table_names( collection: 'pg.PgCollection', return_layer_names:bool=False ):
+    '''
+    Retrieves names of all (sentences) hash tables of the given collection. 
+    If `return_layer_names` is set, then extracts layer names from table names 
+    and returns layer names instead.
+    '''
+    table_prefix = f'{collection.name}__%'
+    table_suffix = '%__hash'
+    with collection.storage.conn:
+        with collection.storage.conn.cursor() as c:
+            c.execute(SQL('SELECT table_name from information_schema.tables '
+                          'WHERE table_schema={} and table_name LIKE {} and '
+                          'table_name LIKE {} '
+                          ).format(Literal(collection.storage.schema), 
+                                   Literal(table_prefix), Literal(table_suffix)))
+            table_names = [row[0] for row in c.fetchall()]
+            if return_layer_names:
+                # Extract layer names from table names
+                table_prefix = f'{collection.name}__'
+                table_suffix = '__hash'
+                table_names = \
+                    [ t[len(table_prefix):-1*len(table_suffix)] for t in table_names ]
+            return table_names
+
+
 def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollection', validate:bool=True ):
     '''
     Creates collection's sentence hash table. 
