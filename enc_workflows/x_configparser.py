@@ -199,6 +199,9 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             # Logging level used during the database insertion
             clean_conf['db_insertion_log_level'] = \
                 logging.getLevelName( config[section].get('db_insertion_log_level', 'INFO') )
+            #
+            # Log document completions
+            clean_conf['db_log_doc_completion'] = config[section].getboolean('db_log_doc_completion', False) 
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf

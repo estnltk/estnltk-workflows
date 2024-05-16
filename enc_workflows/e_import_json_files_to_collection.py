@@ -46,6 +46,7 @@ if len(sys.argv) > 1:
             validate_database_access_parameters( configuration )
             logger.setLevel( configuration['db_insertion_log_level'] )
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+            log_doc_completions = configuration.get('db_log_doc_completion', False)
             add_layer_prefix = configuration['add_layer_prefix']
             add_layer_suffix = configuration['add_layer_suffix']
             # Iterate over all vert subdirs and all document subdirs within these subdirs
@@ -79,7 +80,8 @@ if len(sys.argv) > 1:
                                                    sentences_layer=sentences_layer, 
                                                    sentences_hash_attr='sha256', 
                                                    add_layer_prefix=add_layer_prefix,
-                                                   add_layer_suffix=add_layer_suffix ) as text_inserter:
+                                                   add_layer_suffix=add_layer_suffix,
+                                                   log_doc_completions=log_doc_completions) as text_inserter:
                     for vert_subdir in vert_subdirs:
                         # Start processing one vert_file / vert_subdir
                         subdir_start_time = datetime.now()
