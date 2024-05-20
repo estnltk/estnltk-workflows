@@ -202,6 +202,19 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             #
             # Log document completions
             clean_conf['db_log_doc_completion'] = config[section].getboolean('db_log_doc_completion', False) 
+            #
+            # Maximum buffer size (in table rows) for the insert query. 
+            clean_conf['db_insert_buffer_size'] = \
+                config[section].getint('db_insert_buffer_size', 10000)
+            assert clean_conf['db_insert_buffer_size'] > 0, \
+                f"(!) db_insert_buffer_size must be a positive integer, not {clean_conf['db_insert_buffer_size']}"
+            #
+            # Soft approximate insert query length limit (in unicode characters). 
+            clean_conf['db_insert_query_length_limit'] = \
+                config[section].getint('db_insert_query_length_limit', 5000000) 
+            assert clean_conf['db_insert_query_length_limit'] > 0, \
+                f"(!) db_insert_query_length_limit must be a positive integer, not {clean_conf['db_insert_query_length_limit']}"
+
     if 'collection' in clean_conf.keys():
         # Return collected configuration
         return clean_conf

@@ -49,6 +49,8 @@ if len(sys.argv) > 1:
             log_doc_completions = configuration.get('db_log_doc_completion', False)
             add_layer_prefix = configuration['add_layer_prefix']
             add_layer_suffix = configuration['add_layer_suffix']
+            db_insert_buffer_size = configuration['db_insert_buffer_size']
+            db_insert_query_length_limit = configuration['db_insert_query_length_limit']
             # Iterate over all vert subdirs and all document subdirs within these subdirs
             vert_subdirs = collect_collection_subdirs(configuration['collection'], only_first_level=True, full_paths=False)
             if len(vert_subdirs) == 0:
@@ -74,8 +76,8 @@ if len(sys.argv) > 1:
                 words_layer = 'words'
                 sentences_layer = 'sentences'
                 with CollectionMultiTableInserter( collection,
-                                                   buffer_size=10000, 
-                                                   query_length_limit=5000000, 
+                                                   buffer_size=db_insert_buffer_size, 
+                                                   query_length_limit=db_insert_query_length_limit, 
                                                    remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                                    sentences_layer=sentences_layer, 
                                                    sentences_hash_attr='sha256', 
