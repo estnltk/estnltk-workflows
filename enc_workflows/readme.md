@@ -47,7 +47,7 @@ Example:
   * `literature_old__sentences__hash` - table for storing sentence hash fingerprints of all documents; hash fingerprints are collected and stored for the purposes of later collection updating: for detecting which sentence tokenizations have been changed and which remain same;
   * `literature_old__morphosyntax__layer` - table for storing morphological and syntactic annotations of all documents;
  
-_Overwriting mode:_ pass flag `-r` to the script to remove the existing collection and start from the scratch. Be aware that this deletes all the existing tables along with their content.
+_Erasing mode:_ pass flag `-r` to the script to remove the existing collection and start from the scratch. Be aware that this deletes all the existing tables along with their content.
 
 
 ### Document insertion
@@ -59,4 +59,4 @@ Example:
 
 `python  e_import_json_files_to_collection.py  confs/literature_old.ini` reads document JSON files from the collection directory `literature_old`, and stores in the collection's tables.
 
-Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give in errors.
+Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors.
