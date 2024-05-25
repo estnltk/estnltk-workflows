@@ -107,7 +107,29 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             # parsing parameters
             clean_conf['skip_annotated'] = config[section].getboolean('skip_annotated', True)
             clean_conf['use_gpu'] = config[section].getboolean('use_gpu', False)
-            clean_conf['use_cpu_for_long_sentences'] = config[section].getboolean('use_cpu_for_long_sentences', False)
+            #
+            # long_sentences_strategy
+            # NONE/None -- do nothing (process as usual; can run into CUDA memory errors)
+            # USE_CPU   -- use CPU based tagger for long sentences (CPU should have enough memory)
+            # CHUNKING  -- chunk long sentences (robustly) into smaller ones, parse smaller ones, and 
+            #              merge parsing results back into long sentences. Note that due to the 
+            #              robustness of the chunking process, the parsing quality may suffer.
+            clean_conf['long_sentences_strategy'] = config[section].get('long_sentences_strategy', 'NONE')
+            if not isinstance(clean_conf['long_sentences_strategy'], str) or \
+               not clean_conf['long_sentences_strategy'].upper() in ['NONE', 'USE_CPU', 'CHUNKING']:
+                raise ValueError(f'Error in {conf_file}: section {section!r} invalid value '+\
+                                 f'{clean_conf["long_sentences_strategy"]!r} for parameter "long_sentences_strategy". '+\
+                                  'Expected values: NONE, USE_CPU or CHUNKING.')
+            #
+            # Maximum number of words in one sentence while using long_sentences_strategy=CHUNKING
+            # All sentences exceeding the limit will be chunked into smaller sentences with that size
+            clean_conf['parsing_max_words_in_sentence'] = \
+                config[section].getint('parsing_max_words_in_sentence', 1000)
+            if clean_conf['parsing_max_words_in_sentence'] < 1:
+                raise ValueError(f'Error in {conf_file}: section {section!r} invalid value '+\
+                                 f'{clean_conf["parsing_max_words_in_sentence"]!r} for '+\
+                                  'parameter "parsing_max_words_in_sentence". Expected positive integer.')
+            # 
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
         if section.startswith('write_syntax_to_vert'):
             #

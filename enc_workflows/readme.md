@@ -25,7 +25,7 @@ Collection directories are large, and will be distributed separately; configurat
 #### Configuring database access
 
 The first step is to configure database access parameters. 
-This can be done in file [confs/database_conf.ini](confs/database_conf.ini), and the configuration will be commonly used for all collections. 
+This can be done in file [confs/database_conf.ini](confs/database_conf.ini). The configuration will be commonly used for all collections. 
 Find more information about the access parameters from [this tutorial](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb).
 
 #### Creating database tables

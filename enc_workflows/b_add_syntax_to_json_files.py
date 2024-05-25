@@ -22,6 +22,7 @@ from estnltk.converters import text_to_json
 
 from estnltk_neural.taggers import StanzaSyntaxTagger
 from x_stanza_tagger import DualStanzaSyntaxTagger
+from x_stanza_tagger import StanzaSyntaxTaggerWithChunking
 
 from x_utils import collect_collection_subdirs
 from x_utils import convert_original_morph_to_stanza_input_morph
@@ -82,20 +83,31 @@ if len(sys.argv) > 1:
             input_morph_layer = configuration['input_morph_layer']
             input_words_layer = configuration['input_words_layer']
             input_sentences_layer = configuration['input_sentences_layer']
-            if not configuration['use_cpu_for_long_sentences']:
+            max_words_in_sentence = configuration['parsing_max_words_in_sentence']
+            if configuration['long_sentences_strategy'] == 'NONE':
                 syntax_parser = StanzaSyntaxTagger( input_type='morph_extended', \
                                                     words_layer=input_words_layer, \
                                                     sentences_layer=input_sentences_layer, \
                                                     input_morph_layer=input_morph_layer, \
                                                     random_pick_seed=1,
                                                     use_gpu=configuration.get('use_gpu', False) )
-            else:
+            elif configuration['long_sentences_strategy'] == 'CHUNKING':
+                syntax_parser = StanzaSyntaxTaggerWithChunking( input_type='morph_extended', \
+                                                    words_layer=input_words_layer, \
+                                                    sentences_layer=input_sentences_layer, \
+                                                    input_morph_layer=input_morph_layer, \
+                                                    random_pick_seed=1,
+                                                    max_words_in_sentence=max_words_in_sentence,
+                                                    use_gpu=configuration.get('use_gpu', False) )
+            elif configuration['long_sentences_strategy'] == 'USE_CPU':
                 syntax_parser = DualStanzaSyntaxTagger( input_type='morph_extended', \
                                                         words_layer=input_words_layer, \
                                                         sentences_layer=input_sentences_layer, \
                                                         input_morph_layer=input_morph_layer, \
                                                         random_pick_seed=1,
                                                         use_gpu=configuration.get('use_gpu', False) )
+            else:
+                raise ValueError(f'(!) Unexpected "long_sentences_strategy" value {configuration["long_sentences_strategy"]}.')
             print(f'Using {syntax_parser.__class__.__name__}.' )
             # Iterate over all vert subdirs and all document subdirs within these subdirs
             vert_subdirs = collect_collection_subdirs(configuration['collection'], only_first_level=True, full_paths=False)
