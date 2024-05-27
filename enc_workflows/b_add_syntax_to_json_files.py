@@ -84,6 +84,13 @@ if len(sys.argv) > 1:
             input_words_layer = configuration['input_words_layer']
             input_sentences_layer = configuration['input_sentences_layer']
             max_words_in_sentence = configuration['parsing_max_words_in_sentence']
+            #
+            # long_sentences_strategy
+            # NONE/None -- do nothing (process as usual; can run into CUDA memory errors)
+            # USE_CPU   -- use CPU based tagger for long sentences (CPU should have enough memory)
+            # CHUNKING  -- chunk long sentences (robustly) into smaller ones, parse smaller ones, and 
+            #              merge parsing results back into long sentences. Note that due to the 
+            #              robustness of the chunking process, the parsing quality may suffer.
             if configuration['long_sentences_strategy'] == 'NONE':
                 syntax_parser = StanzaSyntaxTagger( input_type='morph_extended', \
                                                     words_layer=input_words_layer, \

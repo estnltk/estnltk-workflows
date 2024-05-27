@@ -6,7 +6,8 @@
 #   limit (1000 words by default) will be cut into 1000 word chunks and analysed 
 #   chunk by chunk;
 #   Based on: 
-#   https://github.com/estnltk/estnltk/blob/main/estnltk_neural/estnltk_neural/taggers/syntax/stanza_tagger/stanza_tagger.py 
+#   https://github.com/estnltk/estnltk/blob/devel_1.7/estnltk_neural/estnltk_neural/taggers/syntax/stanza_tagger/stanza_tagger.py 
+#   ( commit 90bfc1482b6efd40093c068d519eb3481ecc3fe9 ) 
 #
 #   DualStanzaSyntaxTagger: An improved version of StanzaSyntaxTagger which uses 2 
 #   instances of stanza models: GPU/CPU model for parsing texts with normal length 
