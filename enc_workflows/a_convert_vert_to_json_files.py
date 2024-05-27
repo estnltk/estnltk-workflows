@@ -50,6 +50,8 @@ if len(sys.argv) > 1:
         if configuration is not None:
             split_docs = 0
             converted_docs = 0
+            processed_words = 0
+            processed_sentences = 0
             focus_block = None
             too_long_sentences = 0
             # Get divisor & reminder for data parallelization
@@ -124,8 +126,10 @@ if len(sys.argv) > 1:
                         sentence_hash_retagger.retag( text_obj )
                     # Determine output path and write document into output file:
                     json_file_path = get_doc_file_path(collection_directory, input_vert_fname, int(doc_file_id))
+                    processed_sentences += len(text_obj['sentences'])
+                    processed_words += len(text_obj[morph_analysis.name])
                     save_text_obj_as_json_file(text_obj, json_file_path, max_text_size=maximum_text_size, batch_splitting_layer='sentences', 
-                                                                         max_layer_size=max_layer_size, size_validation_layer='morph_analysis_ext' )
+                                                                         max_layer_size=max_layer_size, size_validation_layer=morph_analysis.name )
                     # Post-check:
                     # 1) validate that the document json file was created
                     # 2) check whether the document was split or not
@@ -148,6 +152,8 @@ if len(sys.argv) > 1:
                 print(f' =={collection_directory}==')
                 print(f' Converted documents:  {converted_docs}')
                 print(f'     split documents:  {split_docs}')
+                print(f'           sentences:  {processed_sentences}')
+                print(f'               words:  {processed_words}')
                 if too_long_sentences > 0:
                     print()
                     print(f'(!) too long sentences:  {too_long_sentences}')
