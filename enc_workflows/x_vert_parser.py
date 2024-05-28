@@ -159,7 +159,13 @@ class SimpleVertFileParser:
                 self.document_metadata['_doc_id'] = self.document_id
                 assert self.document_start_line > -1
                 self.document_metadata['_doc_start_line'] = self.document_start_line
-                assert self.document_end_line > -1, f'{self.document_lines[:10]}...{self.document_lines[-10:]} {self.lines} {self.document_id}'
+                # Note: ending tag </doc> can also be missing, like in 
+                # nc23_Literature_Contemporary.vert <doc id="739539" ...
+                # Then we need to update self.document_end_line on the fly.
+                if not (self.document_end_line > -1):
+                    self.document_end_line = (self.lines + 1)
+                assert self.document_end_line > -1, \
+                    f'{self.document_lines[:10]}...{self.document_lines[-10:]} {self.lines} {self.document_id}'
                 self.document_metadata['_doc_end_line']   = self.document_end_line
                 # Copy the old document
                 old_document_metadata = self.document_metadata.copy()
@@ -279,6 +285,8 @@ class SimpleVertFileParser:
             self.document_metadata['_doc_id'] = self.document_id
             assert self.document_start_line > -1
             self.document_metadata['_doc_start_line'] = self.document_start_line
+            if not (self.document_end_line > -1):
+                self.document_end_line = (self.lines + 1)
             assert self.document_end_line > -1
             self.document_metadata['_doc_end_line']   = self.document_end_line
             # Copy the old document
