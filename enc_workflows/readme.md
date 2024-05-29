@@ -19,7 +19,33 @@ This folder contains workflows for processing the vert format Estonian National 
 
 ### Setup and configuration
 
-For each insertable collection, there should be: 1) a collection directory (e.g. `literature_old`, `literature_contemporary`) containing document JSON files (and metadata descriptions), and 2) collection's configuration file (e.g. `literature_old.ini`, `literature_contemporary.ini`). 
+In order to insert a collection, you need: 1) a collection directory (e.g. `literature_old`, `literature_contemporary`) containing document JSON files (and metadata descriptions), and 2) collection's configuration file (e.g. `literature_old.ini`, `literature_contemporary.ini`).
+
+Collection directories have a structure, in which the first level subdirectories correspond to processed .vert files, the second level subdirectories correspond to document groups (each group contains at maximum 30000 documents) and the third level subdirectories contain actual document JSON files (`doc.json`). 
+
+An example: the structure of collection directory `literature_old`:
+
+	literature_old
+	├── meta_fields.txt
+	└── nc23_Literature_Old
+	    ├── 0
+	    │   ├── 0
+	    │   │   └── doc.json
+	    │   ├── 1
+	    │   │   └── doc.json
+	    │   ├── 2
+	    │   │   └── doc.json
+	    │   ├── 3
+	    │   │   └── doc.json
+
+		 ...
+
+	    │   ├── 244
+	    │   │   └── doc.json
+	    │   └── 245
+	    │       └── doc.json
+	    └── meta_fields.txt 
+
 Collection directories are large, and will be distributed separately; configuration files can be found from the directory [confs/](confs/).
 
 #### Configuring database access
