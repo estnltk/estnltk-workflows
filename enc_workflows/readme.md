@@ -19,7 +19,7 @@ This folder contains workflows for processing the vert format Estonian National 
 
 ### Setup and configuration
 
-For each insertable collection, there should be: 1) a collection directory (e.g. `literature_old`, `literature_contemporary`), and 2) collection's configuration file (e.g. `literature_old.ini`, `literature_contemporary.ini`). 
+For each insertable collection, there should be: 1) a collection directory (e.g. `literature_old`, `literature_contemporary`) containing document JSON files (and metadata descriptions), and 2) collection's configuration file (e.g. `literature_old.ini`, `literature_contemporary.ini`). 
 Collection directories are large, and will be distributed separately; configuration files can be found from the directory [confs/](confs/).
 
 #### Configuring database access

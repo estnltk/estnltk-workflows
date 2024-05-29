@@ -31,8 +31,28 @@ from x_db_utils import CollectionMultiTableInserter
 insert_only_first = -1
 
 
+def sorted_vert_subdirs( configuration, vert_subdirs ):
+    '''Sorts vert subdirs into the order in which vert files appear in the configuration file.'''
+    sorted_subdirs = []
+    for conf_vert_file in configuration['vert_files']:
+        subdir_found = False
+        for subdir in vert_subdirs:
+            if subdir in conf_vert_file:
+                assert subdir not in sorted_subdirs
+                sorted_subdirs.append(subdir)
+                subdir_found = True
+                break
+        if not subdir_found:
+            raise Exception(f'(!) Missing vert subdir corresponding to the vert file {conf_vert_file!r} '+\
+                            f'listed in the configuration. \n Available subdirs: {vert_subdirs!r}')
+    return sorted_subdirs
+
+
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
+    for s_arg in sys.argv[1:]:
+        if s_arg.isdigit():
+            insert_only_first = int(s_arg)
     if os.path.isfile(input_fname):
         # Get & validate configuration parameters
         configuration = None
@@ -67,6 +87,8 @@ if len(sys.argv) > 1:
                                          create_schema_if_missing=configuration.get('create_schema_if_missing', False))
             # Check for the existence of the collection
             if collection_name in storage.collections:
+                if insert_only_first > 0:
+                    print(f'[Debugging] Inserting only first {insert_only_first} documents.')
                 collection = storage[collection_name]
                 total_start_time = datetime.now()
                 processed_docs = 0
@@ -84,7 +106,7 @@ if len(sys.argv) > 1:
                                                    add_layer_prefix=add_layer_prefix,
                                                    add_layer_suffix=add_layer_suffix,
                                                    log_doc_completions=log_doc_completions) as text_inserter:
-                    for vert_subdir in vert_subdirs:
+                    for vert_subdir in sorted_vert_subdirs( configuration, vert_subdirs ):
                         # Start processing one vert_file / vert_subdir
                         subdir_start_time = datetime.now()
                         print(f'Importing files from {vert_subdir} ...')
@@ -101,6 +123,9 @@ if len(sys.argv) > 1:
                         # Fetch all the document subdirs
                         document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
                         for doc_subdir in tqdm( document_subdirs, ascii=True ):
+                            if insert_only_first > 0 and insert_only_first <= processed_docs:
+                                # [Debugging]: skip the following documents
+                                continue
                             document_id = int( doc_subdir.split(os.path.sep)[-1] )
                             # Collect document json files
                             found_doc_files = []
@@ -129,8 +154,6 @@ if len(sys.argv) > 1:
                                     processed_words += len(text_obj[words_layer])
                                     processed_sentences += len(text_obj[sentences_layer])
                                 processed_docs += 1
-                            if insert_only_first > 0 and insert_only_first <= processed_docs:
-                                break
                             global_doc_id += 1
                         print(f'Processing {vert_subdir} took {datetime.now()-subdir_start_time}.')
                 # Complete the whole collection
