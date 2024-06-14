@@ -28,8 +28,10 @@ from x_configparser import validate_database_access_parameters
 from x_db_utils import CollectionMultiTableInserter
 
 # Insert only first N documents [for debugging]
-insert_only_first = -1
+insert_only_first = 0
 
+# Insert only last N documents [for debugging]
+insert_only_last = 0
 
 def sorted_vert_subdirs( configuration, vert_subdirs ):
     '''Sorts vert subdirs into the order in which vert files appear in the configuration file.'''
@@ -53,6 +55,9 @@ if len(sys.argv) > 1:
     for s_arg in sys.argv[1:]:
         if s_arg.isdigit():
             insert_only_first = int(s_arg)
+        elif s_arg[0]=='-' and s_arg[1:].isdigit():
+            insert_only_last = int(s_arg)
+            assert insert_only_last < 0
     if os.path.isfile(input_fname):
         # Get & validate configuration parameters
         configuration = None
@@ -89,6 +94,8 @@ if len(sys.argv) > 1:
             if collection_name in storage.collections:
                 if insert_only_first > 0:
                     print(f'[Debugging] Inserting only first {insert_only_first} documents.')
+                if insert_only_last < 0:
+                    print(f'[Debugging] Inserting only last {insert_only_last*-1} documents.')
                 collection = storage[collection_name]
                 total_start_time = datetime.now()
                 processed_docs = 0
@@ -122,9 +129,16 @@ if len(sys.argv) > 1:
                             _, vert_file = os.path.split(vert_file)
                         # Fetch all the document subdirs
                         document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
+                        subdir_id = 0
                         for doc_subdir in tqdm( document_subdirs, ascii=True ):
+                            subdir_id += 1
                             if insert_only_first > 0 and insert_only_first <= processed_docs:
                                 # [Debugging]: skip the following documents
+                                global_doc_id += 1
+                                continue
+                            if insert_only_last < 0 and subdir_id < len(document_subdirs) + insert_only_last:
+                                # [Debugging]: skip the documents until last documents
+                                global_doc_id += 1
                                 continue
                             document_id = int( doc_subdir.split(os.path.sep)[-1] )
                             # Collect document json files
