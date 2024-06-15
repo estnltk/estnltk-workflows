@@ -6,6 +6,7 @@ import re
 import os, os.path
 import configparser
 import logging
+import warnings
 
 def parse_configuration( conf_file:str, load_db_conf:bool=False ):
     '''Parses ENC processing configuration parameters from the given INI file.'''
@@ -202,21 +203,41 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             # Add src as a meta field of the collection base table 
             clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)
             #
-            # Add given layer prefix to all layers in the collection.
-            # This alters both layer table names and layer json objects stored into the datbase
-            add_layer_prefix = config[section].get('add_layer_prefix', '')
-            if not isinstance(add_layer_prefix, str):
-                raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
-                                  f'attribute add_layer_prefix be a string, not {type(add_layer_prefix)}.' )
-            clean_conf['add_layer_prefix'] = add_layer_prefix.strip()
+            # Collect specific instructions on how to rename layers in the database,
+            # for instance: sentences => sentences_v1, morphosyntax => morphosyntax_v2024-06
             #
-            # Add given layer suffix to all layers in the collection.
-            # This alters both layer table names and layer json objects stored into the datbase
-            add_layer_suffix = config[section].get('add_layer_suffix', '')
-            if not isinstance(add_layer_suffix, str):
-                raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
-                                  f'attribute add_layer_suffix be a string, not {type(add_layer_suffix)}.' )
-            clean_conf['add_layer_suffix'] = add_layer_suffix.strip()
+            clean_conf['layer_renaming_map'] = None
+            layer_renaming_map_string = config[section].get('rename_layers', None)
+            if isinstance(layer_renaming_map_string, str):
+                layer_renamings = [f.strip() for f in re.split('[;,]', layer_renaming_map_string) if len(f.strip()) > 0]
+                layer_renamings_dict = dict()
+                for renaming in layer_renamings:
+                    parts = re.split('[-=]+>', renaming)
+                    # Validate renaming instruction
+                    if len(parts) != 2:
+                        raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                          f'attribute rename_layers contains illegal renaming instruction {renaming!r}. '+
+                                           'Example of a correct instruction: sentences => sentences_v1')
+                    source_layer = parts[0].strip()
+                    target_layer = parts[1].strip()
+                    if len(source_layer) == 0:
+                        raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                          f'attribute rename_layers contains illegal renaming instruction {renaming!r}: '+
+                                           'source layer cannot be empty string. Example of a correct instruction: sentences => sentences_v1')
+                    elif len(target_layer) == 0:
+                        raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                          f'attribute rename_layers contains illegal renaming instruction {renaming!r}: '+
+                                           'target layer cannot be empty string. Example of a correct instruction: sentences => sentences_v1')
+                    if not re.match(r'[A-Za-z0-9_\\-]+', target_layer):
+                        raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                          f'attribute rename_layers contains illegal renaming instruction {renaming!r}: '+
+                                          r'target layer name must match regular expression "[A-Za-z0-9_\\-]+"')
+                    if source_layer in layer_renamings_dict.keys():
+                        warnings.warn(f'(!) Duplicate layer renaming instruction for {source_layer}: => {layer_renamings_dict[source_layer]}'+\
+                                      f'and => {target_layer}. Keeping the last instruction.')
+                    layer_renamings_dict[source_layer] = target_layer
+                if len(layer_renamings_dict.keys()) > 0:
+                    clean_conf['layer_renaming_map'] = layer_renamings_dict
             #
             # Logging level used during the database insertion
             clean_conf['db_insertion_log_level'] = \

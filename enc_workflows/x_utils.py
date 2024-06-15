@@ -630,20 +630,26 @@ def load_collection_layer_templates(configuration: dict):
         raise FileNotFoundError(f'(!) No JSON documents found from collection dir {json_doc_subdir!r}')
 
 
-def rename_layer(layer: Layer, add_layer_prefix:str='', add_layer_suffix:str=''):
+def rename_layer(layer: Layer, renaming_map:dict=None):
     '''
-    Renames Layer by adding given prefix and suffix to its name. 
-    If layer has `parent` or is `enveloping`, then also renames 
-    those layers correspondingly.
+    Renames Layer by changing its name to a new name from `renaming_map`. 
+    `renaming_map` must be a dictionary mapping from old layer names to 
+    new ones.
+    If layer has `parent` or it is `enveloping`, and corresponding 
+    layers are available in the `renaming_map`, then also renames those 
+    layers correspondingly.
     Returnes renamed layer.
     '''
-    if len(add_layer_prefix) > 0 or len(add_layer_suffix) > 0:
+    if renaming_map is not None and isinstance(renaming_map, dict):
         if isinstance(layer, Layer):
-            layer.name = f'{add_layer_prefix}{layer.name}{add_layer_suffix}'
+            layer.name = renaming_map.get( layer.name, layer.name )
+            assert isinstance(layer.name, str)
             if isinstance(layer.parent, str):
-                layer.parent = f'{add_layer_prefix}{layer.parent}{add_layer_suffix}'
+                layer.parent = renaming_map.get( layer.parent, layer.parent )
+                assert isinstance(layer.parent, str)
             if isinstance(layer.enveloping, str):
-                layer.enveloping = f'{add_layer_prefix}{layer.enveloping}{add_layer_suffix}'
+                layer.enveloping = renaming_map.get( layer.enveloping, layer.enveloping )
+                assert isinstance(layer.enveloping, str)
         else:
             raise NotImplementedError(f'(!) Renaming {type(layer)} not implemented')
         return layer

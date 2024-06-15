@@ -72,8 +72,7 @@ if len(sys.argv) > 1:
             logger.setLevel( configuration['db_insertion_log_level'] )
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
             log_doc_completions = configuration.get('db_log_doc_completion', False)
-            add_layer_prefix = configuration['add_layer_prefix']
-            add_layer_suffix = configuration['add_layer_suffix']
+            layer_renaming_map = configuration['layer_renaming_map']
             db_insert_buffer_size = configuration['db_insert_buffer_size']
             db_insert_query_length_limit = configuration['db_insert_query_length_limit']
             # Iterate over all vert subdirs and all document subdirs within these subdirs
@@ -110,8 +109,7 @@ if len(sys.argv) > 1:
                                                    remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                                    sentences_layer=sentences_layer, 
                                                    sentences_hash_attr='sha256', 
-                                                   add_layer_prefix=add_layer_prefix,
-                                                   add_layer_suffix=add_layer_suffix,
+                                                   layer_renaming_map=layer_renaming_map,
                                                    log_doc_completions=log_doc_completions) as text_inserter:
                     for vert_subdir in sorted_vert_subdirs( configuration, vert_subdirs ):
                         # Start processing one vert_file / vert_subdir

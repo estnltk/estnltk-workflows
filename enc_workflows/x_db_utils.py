@@ -79,12 +79,10 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     tuple( [a for a in template.attributes if a != sentences_hash_attr] )
                 assert sentences_hash_attr not in template.attributes
 
-    if len(configuration['add_layer_prefix']) > 0 or \
-       len(configuration['add_layer_suffix']) > 0:
-        # Rename layers: provide prefixes/suffixes to layer names
+    if configuration['layer_renaming_map'] is not None:
+        # Rename layers
         for template in layer_templates:
-            rename_layer(template, add_layer_prefix=configuration['add_layer_prefix'],
-                                   add_layer_suffix=configuration['add_layer_suffix'])
+            rename_layer(template, renaming_map=configuration['layer_renaming_map'])
     
     # Create layer tables. Note we need to bypass the standard layer table 
     # creation mechanism, which forbids layer creation on empty collection
@@ -343,10 +341,10 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
                             f'among the layer templates {template_names!r}. Make sure add_sentence_hashes '+\
                             'was switched on while exporting documents to JSON. ')
     # Construct sentence hash table name/identifier
-    if len(configuration['add_layer_prefix']) > 0 or \
-       len(configuration['add_layer_suffix']) > 0:
-        # Add prefix/suffix to layer name
-        layer_name = f'{configuration["add_layer_prefix"]}{layer_name}{configuration["add_layer_suffix"]}'
+    if configuration['layer_renaming_map'] is not None:
+        assert isinstance( configuration['layer_renaming_map'], dict )
+        # Rename sentences layer (if requested)
+        layer_name = configuration['layer_renaming_map'].get( layer_name, layer_name )
     sentence_hash_table = sentence_hash_table_name(collection.name, layer_name=layer_name )
     if sentence_hash_table_exists( collection, layer_name=layer_name ):
         raise Exception( "The sentence hash table {!r} already exists in the collection {!r}.".format( \
@@ -601,14 +599,12 @@ class CollectionMultiTableInserter():
        Builds upon: 
        https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/collection_text_object_inserter.py
        https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/collection_detached_layer_inserter.py
-       
-       ( WORK IN PROGRESS )
     '''
 
     def __init__(self, collection, buffer_size=10000, query_length_limit=5000000, 
                        remove_sentences_hash_attr=False, sentences_layer='sentences', 
-                       sentences_hash_attr='sha256', add_layer_prefix:str='', 
-                       add_layer_suffix:str='', log_doc_completions:bool=False ):
+                       sentences_hash_attr='sha256', layer_renaming_map:dict=None, 
+                       log_doc_completions:bool=False ):
         """Initializes context manager for Text object insertions.
         
         Parameters:
@@ -634,12 +630,10 @@ class CollectionMultiTableInserter():
         :param sentences_hash_attr: str
             Name of the hash fingerprint attribute in the `sentences_layer`.
             Default: 'sha256'
-        :param add_layer_prefix: str
-            A string prefix to be added to layer name.
-            Default: ''
-        :param add_layer_suffix: str
-            A string suffix to be added to layer name.
-            Default: ''
+        :param layer_renaming_map:dict
+            A dictionary specifying how to rename layers, mapping from old layer 
+            names (strings) to new ones (strings).
+            Default: None (no layers will be renamed);
         :param log_doc_completions: bool
             Whether completed insertions of documents will be explicitly logged.
             (Default: False)
@@ -650,8 +644,8 @@ class CollectionMultiTableInserter():
                               "PgCollection version 4.0+ is required.").format(self.collection.version) )
         self.buffer_size = buffer_size
         self.query_length_limit = query_length_limit
-        self.add_layer_prefix = add_layer_prefix
-        self.add_layer_suffix = add_layer_suffix
+        assert layer_renaming_map is None or isinstance(layer_renaming_map, dict)
+        self.layer_renaming_map = layer_renaming_map
         self.log_doc_completions = log_doc_completions
         # Make mapping from insertion phases to table names and columns
         self.insertion_phase_map = OrderedDict()
@@ -684,10 +678,11 @@ class CollectionMultiTableInserter():
                                                                attrib = self.sentences_hash_attr )
         # Construct sentence hash table name/identifier
         sentences_name_for_hash_table = self.sentences_layer
-        if len(add_layer_prefix) > 0 or len(add_layer_suffix) > 0:
+        if self.layer_renaming_map is not None:
             # Add prefix/suffix to layer name
-            sentences_name_for_hash_table = \
-                f'{add_layer_prefix}{sentences_name_for_hash_table}{add_layer_suffix}'
+            sentences_name_for_hash_table = (self.layer_renaming_map).get( sentences_name_for_hash_table, \
+                                                                           sentences_name_for_hash_table ) 
+            assert isinstance(sentences_name_for_hash_table, str)
         sentence_hash_table = sentence_hash_table_name(self.collection.name, \
                                                        layer_name=sentences_name_for_hash_table)
         sentence_hash_id    = sentence_hash_table_identifier(self.collection.storage, \
@@ -699,8 +694,6 @@ class CollectionMultiTableInserter():
         # Layer tables
         layers = list(self.collection.structure)
         for layer_name in layers:
-            assert layer_name.startswith(self.add_layer_prefix)
-            assert layer_name.endswith(self.add_layer_suffix)
             layer_table = layer_table_name(collection.name, layer_name)
             table_identifier = \
                 layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
@@ -781,12 +774,17 @@ class CollectionMultiTableInserter():
             elif phase.startswith('_layer_'):
                 # Insert Text's layer
                 layer_name = phase[7:]
-                if len(self.add_layer_prefix) > 0:
-                    # Remove prefix from the name
-                    layer_name = layer_name[len(self.add_layer_prefix):]
-                if len(self.add_layer_suffix) > 0:
-                    # Remove suffix from the name
-                    layer_name = layer_name[:len(self.add_layer_suffix)*-1]
+                cur_layer_new_name = None
+                if self.layer_renaming_map is not None:
+                    # Fetch the old name of the layer (before it was renamed)
+                    for old_name, new_name in (self.layer_renaming_map).items():
+                        if new_name == layer_name:
+                            layer_name = old_name
+                            cur_layer_new_name = new_name
+                            break
+                    # This layer was not renamed
+                    if cur_layer_new_name is None:
+                        cur_layer_new_name = layer_name
                 assert layer_name in text.layers, \
                     f'(!) Text object is missing insertable layer {layer_name!r}. Available layers: {text.layers}'
                 if self.remove_sentences_hash_attr and layer_name == self.sentences_layer:
@@ -794,11 +792,10 @@ class CollectionMultiTableInserter():
                     self.sentences_hash_remover.retag(text)
                     assert self.sentences_hash_attr not in text[layer_name]
                 layer_object = text[layer_name]
-                if len(self.add_layer_prefix) > 0 or len(self.add_layer_suffix) > 0:
+                if self.layer_renaming_map is not None:
                     # Rename Layer object
-                    rename_layer( layer_object, add_layer_prefix=self.add_layer_prefix, 
-                                                add_layer_suffix=self.add_layer_suffix )
-                    assert layer_object.name == phase[7:]
+                    rename_layer( layer_object, self.layer_renaming_map )
+                    assert layer_object.name == cur_layer_new_name
                 row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
                 assert len(table_columns) == len(row)
                 # If this the last phase of the insertion, then 
