@@ -186,7 +186,7 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
     assert os.path.exists(metadata_file), \
         f'(!) Missing collection metadata file {metadata_file!r}'
     # Forbidden metadata column names
-    forbidden_field_names = ['id', 'text_id', 'initial_id']
+    forbidden_field_names = ['id', 'text_id', 'initial_id', 'initial_src']
     if configuration['add_vert_indexing_info']:
         forbidden_field_names.extend( ['_vert_file', '_vert_doc_id', \
                                        '_vert_doc_start_line', '_vert_doc_end_line'] )
@@ -198,6 +198,11 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
         if field == 'id':
             if not configuration['remove_initial_id']:
                 new_meta_fields.append('initial_id')
+        elif field == 'src':
+            if configuration['rename_meta_table_src']:
+                new_meta_fields.append('initial_src')
+            else:
+                new_meta_fields.append(field)
         else:
             if field in forbidden_field_names:
                 raise ValueError( f'(!) Cannot used {field!r} as a metadata table column '+\
@@ -813,6 +818,7 @@ class CollectionMultiTableInserter():
     @staticmethod 
     def _insertable_text_object( text, add_src=True ):
         # Make new insertable Text that does not have any metadata
+        # (except normalized 'src' attribute, if required)
         assert isinstance(text, Text)
         new_text = Text(text.text)
         if add_src:
@@ -820,7 +826,7 @@ class CollectionMultiTableInserter():
         return new_text, new_text.meta if add_src else new_text
 
     @staticmethod
-    def _insertable_metadata( text, metadata_columns, initial_id='initial_id' ):
+    def _insertable_metadata( text, metadata_columns, initial_id='initial_id', initial_src='initial_src' ):
         # Extract metadata of the document
         text_meta = []
         for mid, meta_key in enumerate(metadata_columns):
@@ -828,6 +834,8 @@ class CollectionMultiTableInserter():
                 continue
             elif meta_key == initial_id:
                 text_meta.append( (text.meta).get("id", SQL_DEFAULT) )
+            elif meta_key == initial_src:
+                text_meta.append( (text.meta).get("src", SQL_DEFAULT) )
             elif meta_key == '_vert_file':
                 text_meta.append( (text.meta).get("_doc_vert_file", SQL_DEFAULT) )
             elif meta_key == '_vert_doc_id':

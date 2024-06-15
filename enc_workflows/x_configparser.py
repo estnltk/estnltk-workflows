@@ -209,6 +209,12 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             # Add src as a meta field of the collection base table 
             clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)
             #
+            # Rename field 'src' to 'initial_src' in the collection metadata table
+            # Because collection's Text objects can have a normalized meta attribute 'src' 
+            # (in Text object's meta, and in a meta field of the collection base table), 
+            # renaming is necessary to distinguish between the two metadata fields
+            clean_conf['rename_meta_table_src'] = config[section].getboolean('rename_meta_table_src', True)
+            #
             # Collect specific instructions on how to rename layers in the database,
             # for instance: sentences => sentences_v1, morphosyntax => morphosyntax_v2024-06 
             # This alters both layer table names and layer json objects stored into the database
