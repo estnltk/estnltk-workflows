@@ -127,17 +127,29 @@ if len(sys.argv) > 1:
                             _, vert_file = os.path.split(vert_file)
                         # Fetch all the document subdirs
                         document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
+                        debug_insertion_goals = None
+                        if insert_only_first > 0 or insert_only_last < 0:
+                            # Debugging: insert only N first/last documents
+                            debug_insertion_goals = dict()
+                            first_to_insert = []
+                            last_to_insert = []
+                            if insert_only_first > 0:
+                                first_to_insert = document_subdirs[:insert_only_first]
+                            if insert_only_last < 0:
+                                last_to_insert = document_subdirs[insert_only_last:]
+                            for i in first_to_insert:
+                                debug_insertion_goals[i] = 1
+                            for i in last_to_insert:
+                                debug_insertion_goals[i] = 1
+                            assert len(debug_insertion_goals.keys()) > 0
                         subdir_id = 0
                         for doc_subdir in tqdm( document_subdirs, ascii=True ):
                             subdir_id += 1
-                            if insert_only_first > 0 and insert_only_first <= processed_docs:
-                                # [Debugging]: skip the following documents
-                                global_doc_id += 1
-                                continue
-                            if insert_only_last < 0 and subdir_id < len(document_subdirs) + insert_only_last:
-                                # [Debugging]: skip the documents until last documents
-                                global_doc_id += 1
-                                continue
+                            if debug_insertion_goals is not None:
+                                # Debugging: skip (majority of) documents
+                                if doc_subdir not in debug_insertion_goals.keys():
+                                    global_doc_id += 1
+                                    continue
                             document_id = int( doc_subdir.split(os.path.sep)[-1] )
                             # Collect document json files
                             found_doc_files = []

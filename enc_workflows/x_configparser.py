@@ -204,7 +204,8 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)
             #
             # Collect specific instructions on how to rename layers in the database,
-            # for instance: sentences => sentences_v1, morphosyntax => morphosyntax_v2024-06
+            # for instance: sentences => sentences_v1, morphosyntax => morphosyntax_v2024-06 
+            # This alters both layer table names and layer json objects stored into the database
             #
             clean_conf['layer_renaming_map'] = None
             layer_renaming_map_string = config[section].get('rename_layers', None)
