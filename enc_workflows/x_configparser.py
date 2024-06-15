@@ -182,6 +182,12 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             # If not provided, then the description will be 'created by {user} on {creation_time}'.
             clean_conf['collection_description'] = config[section].get('collection_description', None)
             #
+            # Whether estnltk version number will be added to the description of the collection table.
+            # So, the description will look like: 
+            #        'created by {user} on {creation_time} (estnltk v{version})'.
+            clean_conf['add_estnltk_version_to_description'] = \
+                config[section].getboolean('add_estnltk_version_to_description', False) 
+            #
             # Description of the collection metadata table. 
             # If not provided, then the description will be 'created by {user} on {creation_time}'.
             clean_conf['metadata_description'] = config[section].get('metadata_description', None)

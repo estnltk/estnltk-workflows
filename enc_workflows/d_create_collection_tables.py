@@ -7,6 +7,7 @@
 #
 
 import json
+import time
 import re, sys
 import os, os.path
 
@@ -83,6 +84,11 @@ if len(sys.argv) > 1:
             
             # Add new collection
             meta = {'src': 'str'} if configuration['add_src_as_meta'] else None
+            if collection_description is None:
+                collection_description = 'created by {} on {}'.format(storage.user, time.asctime())
+            if configuration['add_estnltk_version_to_description']:
+                from estnltk import __version__ as estnltk_version
+                collection_description = f'{collection_description} (estnltk v{estnltk_version})'
             storage.add_collection( collection_name, description=collection_description, meta=meta )
 
             # Create collection layer tables
