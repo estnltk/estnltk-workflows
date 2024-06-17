@@ -56,7 +56,7 @@ if len(sys.argv) > 1:
             too_long_sentences = 0
             # Get divisor & reminder for data parallelization
             for sys_arg in sys.argv[2:]:
-                m = re.match('(\d+)[,:;](\d+)', sys_arg)
+                m = re.match(r'(\d+)[,:;](\d+)', sys_arg)
                 if m:
                     divisor = int(m.group(1))
                     assert divisor > 0
@@ -88,14 +88,23 @@ if len(sys.argv) > 1:
                                                                            add_document_index=True,
                                                                            original_layer_prefix='',
                                                                            logger=logger):
-                    assert text_obj.layers == {'words', 'tokens', 'paragraphs', 'morph_analysis', 
-                                               'compound_tokens', 'word_chunks', 'sentences'}
+                    # Check that the document has a minimal set of (required) layers
+                    missing_layers = []
+                    for required_layer in {'words', 'morph_analysis', 'sentences'}:
+                         if required_layer not in text_obj.layers:
+                            missing_layers.append( required_layer )
+                    if len(missing_layers) > 0:
+                        raise AssertionError(f'(!) Unexpectedly Text obj is missing layers: {missing_layers!r}. '+\
+                                             f'Existing layers: {text_obj.layers} in \ndoc with {text_obj.meta!r}')
+                    # Check that the document has a minimal set of (required) metadata
                     assert [key in text_obj.meta for key in ['_doc_id', '_doc_start_line', '_doc_end_line']]
                     # Remove redundant layers
-                    text_obj.pop_layer('compound_tokens')
-                    text_obj.pop_layer('tokens')
-                    text_obj.pop_layer('word_chunks')
-                    text_obj.pop_layer('paragraphs')
+                    for layer in sorted( list(text_obj.layers) ):
+                        if layer not in {'words', 'morph_analysis', 'sentences'}:
+                            if layer in text_obj.layers:
+                                text_obj.pop_layer( layer )
+                    assert text_obj.layers == {'words', 'morph_analysis', 'sentences'}, \
+                        f'(!) Unexpectedly Text obj has layers: {text_obj.layers!r} in \ndoc with {text_obj.meta!r}.'
                     # Rename 'morph_analysis' -> 'morph_analysis_ext' to avoid confusion
                     # ( StanzaSyntaxTagger has some hard-coded checks that will raise an 
                     #  alarm if input_type 'morph_extended' goes with layer named 'morph_analysis' )
