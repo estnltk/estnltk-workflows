@@ -31,6 +31,9 @@ from x_vert_parser import SimpleVertFileParser
 from x_vert_parser import SyntaxVertFileWriter
 from x_vert_parser import collect_sentence_tokens
 
+# Write only to the given vert file [optional]
+target_vert_file = None
+
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
     if os.path.isfile(input_fname):
@@ -44,6 +47,12 @@ if len(sys.argv) > 1:
             processed_docs = 0
             processed_words = 0
             processed_sentences = 0
+            # Get target .vert file (optional)
+            for sys_arg in sys.argv[2:]:
+                if ( sys_arg.lower() ).endswith('.vert'):
+                    target_vert_file = sys_arg
+                    print(f'Focus: write syntax only to file {target_vert_file!r}, skip other files.')
+                    break
             # Get collection's parameters
             collection_directory = configuration['collection']
             syntax_layer_name = configuration.get('output_syntax_layer', None)
@@ -68,7 +77,6 @@ if len(sys.argv) > 1:
             for vert_subdir in vert_subdirs:
                 # Start processing one vert_file / vert_subdir
                 subdir_start_time = datetime.now()
-                print(f'Processing {vert_subdir} ...')
                 full_subdir = os.path.join(configuration['collection'], vert_subdir)
                 # Find input vert file corresponding to the vert_subdir
                 vert_file = [v_file for v_file in configuration['vert_files'] if vert_subdir in v_file]
@@ -81,6 +89,10 @@ if len(sys.argv) > 1:
                 _, vert_fname_with_ext = os.path.split(vert_file)
                 vert_fname, vert_ext = os.path.splitext(vert_fname_with_ext)
                 vert_output_fname = f'{vert_fname}{vert_output_suffix}{vert_ext}'
+                if target_vert_file is not None and vert_fname_with_ext.lower() != target_vert_file.lower():
+                    # Focus only on writing specific vert file, skip others ...
+                    continue
+                print(f'Processing {vert_subdir} ...')
                 # Launch new vert_file_parser
                 vert_file_parser = SimpleVertFileParser(vert_file)
                 # Launch new vert file writer
@@ -245,6 +257,8 @@ if len(sys.argv) > 1:
             if processed_docs > 0:
                 print()
                 print(f' =={collection_directory}==')
+                if target_vert_file is not None:
+                    print(f'    Focus .vert file:  {target_vert_file}')
                 print(f' Processed documents:  {processed_docs}')
                 print(f' Processed sentences:  {processed_sentences}')
                 print(f'     Processed words:  {processed_words}')
