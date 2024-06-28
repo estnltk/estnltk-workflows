@@ -601,14 +601,18 @@ def load_collection_layer_templates(configuration: dict):
     # Collect the first document from JSON files. All other documents should have the same structure / same layers
     first_text = None
     full_subdir = os.path.join( configuration['collection'], vert_subdirs[0] )
-    document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
-    if len(document_subdirs) == 0:
-        raise FileNotFoundError(f'(!) No JSON document subdirectories found from collection dir {full_subdir!r}')
-    json_doc_subdir = document_subdirs[0]
-    for fname in sorted( os.listdir(json_doc_subdir) ):
+    # Optimization: try to find the first JSON document sub-directory without listing all sub-directories
+    first_json_subdir = os.path.join( full_subdir, '0', '0' )
+    if not os.path.exists(first_json_subdir) or not os.path.isdir(first_json_subdir): 
+        # If the first document sub-directory was not available, then list all sub-directories to get the first one
+        document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
+        if len(document_subdirs) == 0:
+            raise FileNotFoundError(f'(!) No JSON document subdirectories found from collection dir {full_subdir!r}')
+        first_json_subdir = document_subdirs[0]
+    for fname in sorted( os.listdir(first_json_subdir) ):
         if fname.startswith('doc') and fname.endswith('.json'):
             # Load Text object
-            fpath = os.path.join(json_doc_subdir, fname)
+            fpath = os.path.join(first_json_subdir, fname)
             first_text = json_to_text(file = fpath)
             # Break, no need to look further
             break
@@ -627,7 +631,7 @@ def load_collection_layer_templates(configuration: dict):
             templates.append( dict_to_layer(layer_dict) )
         return templates
     else:
-        raise FileNotFoundError(f'(!) No JSON documents found from collection dir {json_doc_subdir!r}')
+        raise FileNotFoundError(f'(!) No JSON documents found from dir {first_json_subdir!r}')
 
 
 def rename_layer(layer: Layer, renaming_map:dict=None):
