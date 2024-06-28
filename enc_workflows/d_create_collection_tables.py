@@ -41,7 +41,7 @@ if len(sys.argv) > 1:
         # Get & validate configuration parameters
         configuration = None
         if (input_fname.lower()).endswith('.ini'):
-            configuration = parse_configuration( input_fname, load_db_conf=True )
+            configuration = parse_configuration( input_fname, load_db_conf=True, ignore_missing_vert_file=True )
         else:
             raise Exception('(!) Input file {!r} with unexpected extension, expected a configuration INI file.'.format(input_fname))
         if configuration is not None:

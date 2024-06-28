@@ -8,7 +8,7 @@ import configparser
 import logging
 import warnings
 
-def parse_configuration( conf_file:str, load_db_conf:bool=False ):
+def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_vert_file:bool=False ):
     '''Parses ENC processing configuration parameters from the given INI file.'''
     # Parse configuration file
     config = configparser.ConfigParser()
@@ -38,9 +38,10 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False ):
             if len(vert_files) == 0:
                 raise ValueError(f'Error in {conf_file}: section {section} has empty "vert_files" parameter.')
             else:
-                for vert_file in vert_files:
-                    if not os.path.exists( vert_file ):
-                        raise ValueError(f'Error in {conf_file}: missing file {vert_file!r} listed in "vert_files".')
+                if not ignore_missing_vert_file:
+                    for vert_file in vert_files:
+                        if not os.path.exists( vert_file ):
+                            raise ValueError(f'Error in {conf_file}: missing file {vert_file!r} listed in "vert_files".')
             # Rename morph layer to the given name
             rename_morph_layer = config[section].get('rename_morph_layer', 'morph_analysis_ext')
             if isinstance(rename_morph_layer, str) and not rename_morph_layer.isidentifier():

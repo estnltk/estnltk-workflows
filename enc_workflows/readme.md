@@ -78,7 +78,7 @@ _Erasing mode:_ pass flag `-r` to the script to remove the existing collection a
 
 _\* Remarks about metadata_:
 
-* Document id-s. Each document of a collection will get unique key `text_id` starting from `0`. This key is also used to link document's content distributed over different tables (e.g. content in the metadata table, and in layer tables). Not to be confused with `initial_id*` in the the metadata table which stores the `id` value initially extracted from the `doc` tag in the original vert file, and `_vert_doc_id` which corresponds to the actual index of the document in the original .vert file (starting from `0`). 
+* Document id-s. Each document of a collection will get unique key `text_id` starting from `0`. This key is also used to link document's content distributed over different tables (e.g. content in the metadata table, and in layer tables). Not to be confused with `initial_id*` in the metadata table which stores the `id` value initially extracted from the `doc` tag in the original vert file, and `_vert_doc_id` which corresponds to the actual index of the document in the original .vert file (starting from `0`). 
 
 * Source corpus. Base table of the collection (e.g. `literature_old`) will have metadata column `src` which stores normalized source corpus name (e.g. `Literature Old` or `Literature Contemporary`). The metadata table will also have column `initial_src*` which stores the precise source corpus name extracted from the vert file (e.g. `Literature Old 1864–1945` or `Literature Contemporary 2000–2023`). 
 
