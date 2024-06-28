@@ -68,7 +68,7 @@ Example:
   * `__collections` - a meta table listing all collections and their versions. This is created only once per schema.
   * `literature_old` - base table of the collection, for storing all documents (EstNLTK `Text` objects in JSON), but without linguistic annotations;
   * `literature_old__structure` - table describing structure of the collection: which annotation layers each document has and what are specific properties of layers;  
-  * `literature_old__meta` - table for storing metadata of collection's documents (e.g. `src`, `original_author`, `original_title`,  `title`, `publisher`);
+  * `literature_old__meta` - table for storing metadata of collection's documents (e.g. `initial_id*`, `initial_src*`, `original_author`, `original_title`,  `title`, `publisher`);
   * `literature_old__words__layer` - table for storing word annotations of all documents;
   * `literature_old__sentences__layer` - table for storing sentence annotations of all documents;
   * `literature_old__sentences__hash` - table for storing sentence hash fingerprints of all documents; hash fingerprints are collected and stored for the purposes of later collection updating: for detecting which sentence tokenizations have been changed and which remain same;
@@ -76,6 +76,11 @@ Example:
  
 _Erasing mode:_ pass flag `-r` to the script to remove the existing collection and start from the scratch. Be aware that this deletes all the existing tables along with their content.
 
+_\* Remarks about metadata_:
+
+* Document id-s. Each document of a collection will get unique key `text_id` starting from `0`. This key is also used to link document's content distributed over different tables (e.g. content in the metadata table, and in layer tables). Not to be confused with `initial_id*` in the the metadata table which stores the `id` value initially extracted from the `doc` tag in the original vert file, and `_vert_doc_id` which corresponds to the actual index of the document in the original .vert file (starting from `0`). 
+
+* Source corpus. Base table of the collection (e.g. `literature_old`) will have metadata column `src` which stores normalized source corpus name (e.g. `Literature Old` or `Literature Contemporary`). The metadata table will also have column `initial_src*` which stores the precise source corpus name extracted from the vert file (e.g. `Literature Old 1864–1945` or `Literature Contemporary 2000–2023`). 
 
 ### Document insertion
 
