@@ -175,7 +175,9 @@ class MetaFieldsCollector:
         # Returns collected metadata fields
         return list(self.meta_attributes.keys())
 
-    def output_meta_fields(self, collection_dir:str, vert_fname:str=None, remove_vert_prefix:bool=False):
+    def output_meta_fields(self, collection_dir:str, vert_fname:str=None, 
+                                 remove_vert_prefix:bool=False, 
+                                 merge_with_existing:bool=True):
         if vert_fname is not None and len(vert_fname) > 0:
             # Strip path and extension from the .vert file name
             vert_fpath, vert_fname_with_ext = os.path.split(vert_fname)
@@ -189,8 +191,16 @@ class MetaFieldsCollector:
         assert os.path.exists(full_path), f'(!) Directory path {full_path!r} does not exist. '+\
                                            'Cannot create metadata files.'
         fpath = os.path.join( full_path, 'meta_fields.txt' )
+        new_meta_fields = self.meta_fields[:]
+        if merge_with_existing and os.path.exists( fpath ):
+            # Merge newly collected meta fields with existing ones
+            existing_meta_fields = \
+                MetaFieldsCollector.load_meta_fields( fpath )
+            for ex_field in existing_meta_fields:
+                if ex_field not in new_meta_fields:
+                    new_meta_fields.append( ex_field )
         with open(fpath, mode='w', encoding='utf-8') as out_f:
-            for field in self.meta_fields:
+            for field in new_meta_fields:
                 out_f.write(field)
                 out_f.write('\n')
 
