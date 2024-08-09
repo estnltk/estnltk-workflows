@@ -192,6 +192,18 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
                                        '_vert_doc_start_line', '_vert_doc_end_line'] )
     # Load collection's metadata fields
     meta_fields = MetaFieldsCollector.load_meta_fields( metadata_file )
+    # Find out whether any field names are numbered duplicates
+    numbered_duplicates = []
+    for field in meta_fields:
+        if field[-1].isnumeric():
+            # Remove trailing number(s)
+            prefix = re.sub(r'(\D)[0-9]+$', r'\1', field)
+            assert len( prefix ) < len( field ) and \
+                       field.startswith( prefix )
+            for f2 in meta_fields:
+                if prefix == f2:
+                    numbered_duplicates.append( field )
+                    break
     # Rename 'id' -> 'initial_id' and check for forbidden column names
     new_meta_fields = []
     for field in meta_fields:
@@ -209,6 +221,11 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
                                   f'name, because name {field!r} is already reserved for '+\
                                   'system purposes. Modify x_db_utils.create_collection_metadata_table() '+\
                                   'and rename the metadata field.')
+            if configuration['merge_duplicate_meta_fields']:
+                if field in numbered_duplicates:
+                    # Skip numbered duplicate
+                    logger.info('discarding duplicate meta field {!r}'.format(field))
+                    continue
             new_meta_fields.append(field)
     # Construct metadata table name/identifier
     metadata_table = metadata_table_name(collection.name)

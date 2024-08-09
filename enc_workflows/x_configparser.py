@@ -210,6 +210,10 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
             # Add src as a meta field of the collection base table 
             clean_conf['add_src_as_meta'] = config[section].getboolean('add_src_as_meta', True)
             #
+            # Merge duplicate meta fields, such as 'genre' and 'genre2' or 'topic' and 'topic2', into 
+            # one field in the collection metadata table (avoid unnecessary duplication). 
+            clean_conf['merge_duplicate_meta_fields'] = config[section].getboolean('merge_duplicate_meta_fields', False)
+            #
             # Rename field 'src' to 'initial_src' in the collection metadata table
             # Because collection's Text objects can have a normalized meta attribute 'src' 
             # (in Text object's meta, and in a meta field of the collection base table), 
