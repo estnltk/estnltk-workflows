@@ -202,6 +202,8 @@ if len(sys.argv) > 1:
 
         else:
             print(f'Missing or bad configuration in {input_fname!r}. Unable to get configuration parameters.')
+    else:
+        print(f'(!) {input_fname!r} is not an existing file. Config INI file name required as the first input argument.')
 else:
-    print('Config INI name required as an input argument.')
+    print('Config INI file name required as an input argument.')
 
