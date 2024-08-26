@@ -150,8 +150,8 @@ if len(sys.argv) > 1:
                             vert_file = vert_file[0]
                             # Just in case: remove directory name from vert file
                             _, vert_file = os.path.split(vert_file)
-                        # Fetch all the document subdirs
-                        document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
+                        # Fetch all the document subdirs and sort by document id-s
+                        document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True, sort=True)
                         debug_insertion_goals = None
                         if insert_only_first > 0 or insert_only_last < 0:
                             # Debugging: insert only N first/last documents
