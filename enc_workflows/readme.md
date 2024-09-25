@@ -92,3 +92,32 @@ Example:
 `python  e_import_json_files_to_collection.py  confs/literature_old.ini` reads document JSON files from the collection directory `literature_old`, and stores in the collection's tables.
 
 Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors.
+
+#### Data parallelization
+
+The insertion script also supports data parallelization: you can launch multiple instances of the script and give each instance a (non-overlapping) sub set of data for insertion. 
+For this, use command line parameters `DIVISOR,REMAINDER` (both integers) to insert only texts for which holds `text_id % DIVISOR == REMAINDER`. 
+
+Example 1: Launch two separate jobs for inserting `balanced_and_reference_corpus` data:
+
+	$ python  e_import_json_files_to_collection.py  confs/balanced_and_reference_corpus.ini  2,0
+
+(this inserts only texts with id-s: 0, 2, 4, 6, 8, ... )
+
+	$ python  e_import_json_files_to_collection.py  confs/balanced_and_reference_corpus.ini  2,1
+
+(this inserts only texts with id-s: 1, 3, 5, 7, 9, ... )
+
+Example 2: Launch three separate jobs for inserting `balanced_and_reference_corpus` data:
+
+	$ python  e_import_json_files_to_collection.py  confs/balanced_and_reference_corpus.ini  3,0
+
+(this inserts only texts with id-s: 0, 3, 6, 9, 12, ... )
+
+	$ python  e_import_json_files_to_collection.py  confs/balanced_and_reference_corpus.ini  3,1
+
+(this inserts only texts with id-s: 1, 4, 7, 10, 13, ... )
+
+	$ python  e_import_json_files_to_collection.py  confs/balanced_and_reference_corpus.ini  3,2
+
+(this inserts only texts with id-s: 2, 5, 8, 11, 14, ... )

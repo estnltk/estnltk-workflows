@@ -4,6 +4,18 @@
 #   
 #   Requires name of a configuration INI file as an input argument. 
 #
+#   This script supports data parallelization: you can launch multiple instances 
+#   of the script and give each instance a (non-overlapping) sub set of data for 
+#   processing. Use command line parameters `divisor,remainder` to process only 
+#   texts for which holds `text_id % divisor == remainder`. 
+#   For instance: 
+#
+#      >> python e_import_json_files_to_collection.py  confs\balanced_and_reference_corpus.ini   2,0
+#      ... processes texts 0, 2, 4, 6, 8, ...
+#
+#      >> python e_import_json_files_to_collection.py  confs\balanced_and_reference_corpus.ini   2,1
+#      ... processes texts 1, 3, 5, 7, 9, ...
+#
 
 import json
 import re, sys
@@ -52,9 +64,22 @@ def sorted_vert_subdirs( configuration, vert_subdirs ):
 
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
+    focus_block = None
     for s_arg in sys.argv[1:]:
+        # Get divisor & reminder for data parallelization
+        m = re.match('(\d+)[,:;](\d+)', s_arg)
+        if m:
+            divisor = int(m.group(1))
+            assert divisor > 0
+            remainder = int(m.group(2))
+            assert remainder < divisor
+            focus_block = (divisor, remainder)
+            print(f'Data parallelization: focus on block {focus_block}.')
+            break
+        # Insert only N first documents
         if s_arg.isdigit():
             insert_only_first = int(s_arg)
+        # Insert only N last documents
         elif s_arg[0]=='-' and s_arg[1:].isdigit():
             insert_only_last = int(s_arg)
             assert insert_only_last < 0
@@ -100,7 +125,7 @@ if len(sys.argv) > 1:
                 processed_docs = 0
                 processed_words = 0
                 processed_sentences = 0
-                global_doc_id = 0
+                global_doc_id = 0   # keeps track doc unique indexes over the whole collection
                 words_layer = 'words'
                 sentences_layer = 'sentences'
                 with CollectionMultiTableInserter( collection,
@@ -125,8 +150,8 @@ if len(sys.argv) > 1:
                             vert_file = vert_file[0]
                             # Just in case: remove directory name from vert file
                             _, vert_file = os.path.split(vert_file)
-                        # Fetch all the document subdirs
-                        document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True)
+                        # Fetch all the document subdirs and sort by document id-s
+                        document_subdirs = collect_collection_subdirs(full_subdir, only_first_level=False, full_paths=True, sort=True)
                         debug_insertion_goals = None
                         if insert_only_first > 0 or insert_only_last < 0:
                             # Debugging: insert only N first/last documents
@@ -151,6 +176,11 @@ if len(sys.argv) > 1:
                                     global_doc_id += 1
                                     continue
                             document_id = int( doc_subdir.split(os.path.sep)[-1] )
+                            # Apply block filter
+                            if focus_block is not None and document_id % focus_block[0] != focus_block[1]:
+                                # Skip the document (wrong block)
+                                global_doc_id += 1
+                                continue
                             # Collect document json files
                             found_doc_files = []
                             for fname in os.listdir(doc_subdir):
@@ -164,17 +194,15 @@ if len(sys.argv) > 1:
                                                                f'Unexpectedly, multiple document files encountered in {doc_subdir!r}' )
                                 for fname in found_doc_files:
                                     fpath = os.path.join(doc_subdir, fname)
-                                    text_obj = json_to_text(file = fpath)
-                                    assert "_doc_vert_file" not in text_obj.meta.keys()
-                                    text_obj.meta["_doc_vert_file"] = vert_file
-                                    assert words_layer in text_obj.layers
-                                    assert sentences_layer in text_obj.layers
-                                    text_inserter.insert(text_obj, global_doc_id)
-                                    #try:
-                                    #    text_obj = json_to_text(file = fpath)
-                                    #    text_inserter.insert(text_obj, global_doc_id)
-                                    #except Exception as err:
-                                    #    raise Exception(f'Failed at processing document {fpath!r} due to an error: ') from err
+                                    try:
+                                        text_obj = json_to_text(file = fpath)
+                                        assert "_doc_vert_file" not in text_obj.meta.keys()
+                                        text_obj.meta["_doc_vert_file"] = vert_file
+                                        assert words_layer in text_obj.layers
+                                        assert sentences_layer in text_obj.layers
+                                        text_inserter.insert(text_obj, global_doc_id)
+                                    except Exception as err:
+                                        raise Exception(f'Failed at processing document {fpath!r} due to an error: ') from err
                                     processed_words += len(text_obj[words_layer])
                                     processed_sentences += len(text_obj[sentences_layer])
                                 processed_docs += 1
