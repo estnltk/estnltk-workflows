@@ -132,6 +132,17 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                                  f'{clean_conf["parsing_max_words_in_sentence"]!r} for '+\
                                   'parameter "parsing_max_words_in_sentence". Expected positive integer.')
             # 
+            # https://stanfordnlp.github.io/stanza/depparse.html : 
+            # "The maximum number of words to process as a minibatch for efficient processing. /---/ 
+            # This parameter should be set larger than the number of words in the longest sentence in 
+            # your input document, or you might run into unexpected behaviors." 
+            # This only works with long_sentences_strategy == CHUNKING;
+            clean_conf['depparse_batch_size'] = config[section].getint('depparse_batch_size', 1500)
+            if clean_conf['depparse_batch_size'] < clean_conf['parsing_max_words_in_sentence']:
+                raise ValueError(f'Error in {conf_file}: section {section!r} invalid value '+\
+                                 f'{clean_conf["depparse_batch_size"]!r} for '+\
+                                 f'parameter "depparse_batch_size". '+\
+                                 f'Expected value greater than {clean_conf["parsing_max_words_in_sentence"]}.')
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
         if section.startswith('write_syntax_to_vert'):
             #

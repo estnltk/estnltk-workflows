@@ -44,6 +44,14 @@ class StanzaSyntaxTaggerWithChunking(Tagger):
     chunk by chunk. This avoids running into "CUDA out of memory" error when processing very long sentences 
     with GPU.
     
+    Note that stanza also has parameter 'depparse_batch_size' which controls "the maximum number of words to 
+    process as a minibatch for efficient processing." According to stanza's documentation: "This parameter 
+    should be set larger than the number of words in the longest sentence in your input document, or you might 
+    run into unexpected behaviors." ( https://stanfordnlp.github.io/stanza/depparse.html )
+    While the default value of stanza's depparse_batch_size is 5000, such large batch size can also cause 
+    "CUDA out of memory" errors if the device does not have enough memory. Therefore, StanzaSyntaxTaggerWithChunking 
+    sets depparse_batch_size value to 1500 by default. 
+    
     The tagger assumes that the segmentation to sentences and words is completed before. Morphological analysis
     can be used, too.
 
@@ -109,7 +117,8 @@ class StanzaSyntaxTaggerWithChunking(Tagger):
                  mark_syntax_error=False,
                  mark_agreement_error=False,
                  use_gpu=False,
-                 max_words_in_sentence=1000
+                 max_words_in_sentence=1000,
+                 depparse_batch_size=1500,
                  ):
         # Make an internal import to avoid explicit stanza dependency
         import stanza
@@ -208,12 +217,17 @@ class StanzaSyntaxTaggerWithChunking(Tagger):
 
         elif self.input_type in ['morph_analysis', 'morph_extended']:
             self.input_layers = [sentences_layer, input_morph_layer, words_layer]
-            self.nlp = stanza.Pipeline(lang='et', processors='depparse',
-                                       dir=self.dir,
-                                       depparse_pretagged=True,
-                                       depparse_model_path=self.model_path,
-                                       use_gpu=self.use_gpu,
-                                       logging_level='WARN')
+            depparse_conf = {}
+            depparse_conf['lang'] = 'et'
+            depparse_conf['processors'] = 'depparse'
+            depparse_conf['dir'] = self.dir
+            depparse_conf['depparse_pretagged'] = True
+            depparse_conf['depparse_model_path'] = self.model_path
+            depparse_conf['use_gpu'] = self.use_gpu
+            depparse_conf['logging_level'] = 'WARN'
+            if isinstance(depparse_batch_size, int):
+                depparse_conf['depparse_batch_size'] = depparse_batch_size
+            self.nlp = stanza.Pipeline( **depparse_conf )
 
     def _make_layer_template(self):
         """Creates and returns a template of the layer."""

@@ -84,6 +84,7 @@ if len(sys.argv) > 1:
             input_words_layer = configuration['input_words_layer']
             input_sentences_layer = configuration['input_sentences_layer']
             max_words_in_sentence = configuration['parsing_max_words_in_sentence']
+            depparse_batch_size = configuration['depparse_batch_size']
             #
             # long_sentences_strategy
             # NONE/None -- do nothing (process as usual; can run into CUDA memory errors)
@@ -105,7 +106,8 @@ if len(sys.argv) > 1:
                                                     input_morph_layer=input_morph_layer, \
                                                     random_pick_seed=1,
                                                     max_words_in_sentence=max_words_in_sentence,
-                                                    use_gpu=configuration.get('use_gpu', False) )
+                                                    use_gpu=configuration.get('use_gpu', False),
+                                                    depparse_batch_size=depparse_batch_size )
             elif configuration['long_sentences_strategy'] == 'USE_CPU':
                 syntax_parser = DualStanzaSyntaxTagger( input_type='morph_extended', \
                                                         words_layer=input_words_layer, \
