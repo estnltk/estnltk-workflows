@@ -7,7 +7,6 @@ This folder contains scripts for preliminary indexing of ENC .vert files and pre
 #### Creating indexes
 
 * `00a_create_vert_doc_id_index.py` --- Creates an index file listing all documents id-s in  *.vert files of the root dir. This index can be later used for making random document selections from the whole corpus. Outputs the index into file `'vert_document_index.csv'`. 
- `python  d_create_collection_tables.py  confs/literature_old.ini` 
 
 * `00b_create_vert_meta_and_counts_index.py` -- Creates two indexes from *.vert files in the root directory: 1) Count index `'vert_counts.csv'` recording document, sentence, word counts in each *.vert file; 2) Meta index files recording document metadata (including words and sentences counts) of each document in a vert file.  Meta index is saved in json format, into file with name pattern `f'meta_indx_{corpus_name}.jl'`, e.g. meta index of `'nc19_Web_2013.vert'` will be saved into `'meta_indx_nc19_Web_2013.jl'`. Note, this is a long process, expected processing time ~6 days.
 
@@ -27,7 +26,7 @@ This folder contains scripts for preliminary indexing of ENC .vert files and pre
 
 #### Testing syntactic parsing
 
-* `03a_compare_stanza_parsing_approaches.py` -- Compares 2 stanza parsing approaches, which differ in the input: 1) parsing texts based on the original `morph_extended` layer extracted from the .vert files; 2) parsing texts based on `morph_extended` layer recreated from the scratch via Vabamorf tool. Collects statistics about differences and outputs after processing. Processes input directory containing EstNLTK's `Text` objects in JSON format (created via script `02c`). For the purpose of more detailed comparison, writes `Text` object JSON files with different parsing layers into folder `f'{input_json_dir}_output'`. 
+* `03a_compare_stanza_parsing_approaches.py` -- Compares 2 stanza parsing approaches, which differ in the input: 1) parsing texts based on the original `morph_extended` layer extracted from the .vert files; 2) parsing texts based on `morph_extended` layer recreated from the scratch via Vabamorf tool. Collects and outputs statistics about differences. Processes input directory containing EstNLTK's `Text` objects in JSON format (created via script `02c`). For the purpose of later detailed comparison, writes `Text` object JSON files with different parsing layers into folder `f'{input_json_dir}_output'`. 
 
 * `03b_pick_random_diffs_from_different_stanza_approaches.py` -- Picks randomly 100 sentences that have syntactic analysis 
 differences from the directory containing EstNLTK JSON files (created via script `03a`). Saves results into file `'random_pick_100_differences.txt'`.
