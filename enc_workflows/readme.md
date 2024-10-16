@@ -56,7 +56,7 @@ Processing steps:
 Scripts `a_convert_vert_to_json_files.py` and `b_add_syntax_to_json_files.py` support document-index-wise data parallelization: you can launch multiple instances of script and give each instance a (non-overlapping) sub set of documents for processing.  
 For this, use command line parameters `DIVISOR,REMAINDER` (both integers) to process only texts for which holds `text_id % DIVISOR == REMAINDER`. 
 
-Example 1: Launch two separate jobs for converting `balanced_and_reference_corpus` documents to json:
+Example: Launch two separate jobs for converting `balanced_and_reference_corpus` documents to json:
 
 	$ python  a_convert_vert_to_json_files.py  confs/balanced_and_reference_corpus.ini  2,0
 
@@ -66,8 +66,8 @@ Example 1: Launch two separate jobs for converting `balanced_and_reference_corpu
 
 (this converts only texts with id-s: 1, 3, 5, 7, 9, ... )
 
-Script `c_write_syntax_to_vert_file.py`: If name of a vert file is given as an additional argument to the script, then it converts only the given vert file and skips other vert files of the collection. 
-For instance, `python  c_write_syntax_to_vert_file.py  confs/balanced_and_reference_corpus.ini  nc19_Balanced_Corpus.vert` converts only `nc19_Balanced_Corpus.vert` and skips `nc19_Reference_Corpus.vert`. 
+Script `c_write_syntax_to_vert_file.py`: If name of a vert file is given as an additional argument to the script, then it processes only the given vert file and skips other vert files of the collection. 
+For instance, `python  c_write_syntax_to_vert_file.py  confs/balanced_and_reference_corpus.ini  nc19_Balanced_Corpus.vert` processes only `nc19_Balanced_Corpus.vert` and skips `nc19_Reference_Corpus.vert`. 
 In this way, you can launch a separate instance of `c_write_syntax_to_vert_file.py` for processing each vert file. 
 
 
