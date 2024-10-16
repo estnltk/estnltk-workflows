@@ -65,6 +65,7 @@ for fname in sorted(os.listdir('.')):
         vert_sentences = 0
         vert_meta = []
         corpus_name = fname.replace(".vert", "")
+        # TODO future: use add_document_index=True to record exact location of each document
         for text_obj in parse_enc_file_iterator(fname, line_progressbar='ascii', restore_morph_analysis=True):
             meta_stripped = meta_without_lang(text_obj.meta)
             assert '__id' not in meta_stripped, f'(!) Unexpected meta: {meta_stripped}'
@@ -73,6 +74,7 @@ for fname in sorted(os.listdir('.')):
             meta_stripped['__words'] = len(text_obj['original_morph_analysis'])
             assert '__sentences' not in meta_stripped, f'(!) Unexpected meta: {meta_stripped}'
             meta_stripped['__sentences'] = len(text_obj['original_sentences'])
+            # TODO: record textual content's length
             #print( meta_without_lang(text_obj.meta) )
             vert_docs += 1
             vert_words += len(text_obj['original_morph_analysis'])
