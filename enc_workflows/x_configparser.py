@@ -144,6 +144,42 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                                  f'parameter "depparse_batch_size". '+\
                                  f'Expected value greater than {clean_conf["parsing_max_words_in_sentence"]}.')
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
+        if section.startswith('add_clauses_timexes_names_layers'):
+            #
+            # Load configuration for adding clauses, timexes and (default) named entities layers to the collection
+            #
+            for layer_name in ['clauses_layer', 'timexes_layer', 'ner_layer']:
+                if not config.has_option(section, layer_name):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} is missing {layer_name!r} parameter.')
+                # output layer name
+                output_layer_name = str(config[section][layer_name])
+                # validate
+                if not output_layer_name.isidentifier():
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {output_layer_name!r} for parameter {layer_name!r}. '+
+                                      'Expected a legitimate identifier for a layer name.')
+                # set output layer name
+                clean_conf[f'b2_output_{layer_name}'] = output_layer_name
+            clean_conf['b2_input_words_layer'] = config[section].get('input_words_layer', 'words')
+            clean_conf['b2_input_sentences_layer'] = config[section].get('input_sentences_layer', "sentences")
+            #
+            # output_mode
+            # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name (default);
+            # OVERWRITE -- overwrites the old json file with new content;
+            # NO_OUTPUT -- do not write output (for debugging only);
+            #
+            clean_conf['b2_output_mode'] = config[section].get('output_mode', 'NEW_FILE')
+            clean_conf['b2_output_file_infix'] = config[section].get('output_file_infix', '_clauses_timexes_names')
+            clean_conf['b2_output_mode'] = clean_conf['b2_output_mode'].upper()
+            assert clean_conf['b2_output_mode'] in ['NEW_FILE', 'OVERWRITE', 'NO_OUTPUT']
+            if clean_conf['b2_output_mode'] == 'NEW_FILE':
+                if (not isinstance(clean_conf['b2_output_file_infix'], str) or \
+                    len(clean_conf['b2_output_file_infix'].strip()) == 0):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["b2_output_file_infix"]!r} for '+\
+                                      'parameter "output_file_infix". Expected a non-empty string.')
+            clean_conf['b2_output_file_infix'] = clean_conf['b2_output_file_infix'].strip()
+            clean_conf['b2_skip_annotated'] = config[section].getboolean('skip_annotated', True)
+            clean_conf['b2_validate_layer_sizes'] = config[section].getboolean('validate_layer_sizes', False)
+            clean_conf['b2_add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
         if section.startswith('write_syntax_to_vert'):
             #
             # Load configuration for writing syntactic annotations to (a new) vert file
