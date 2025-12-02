@@ -43,8 +43,8 @@ Processing steps:
 	* `python  a_convert_vert_to_json_files.py  confs/literature_old.ini`
 	* For storing json files, the script creates a collection directory (e.g. `literature_old`, `literature_contemporary`);
 
-* `b_add_syntax_to_json_files.py` -- adds syntactic analyses to (json format) Text objects and creates morphosyntactic layers combining the (input) morphological annotations and newly created syntactic annotations. Name of the collection's configuration is required as an input argument, e.g.
-	* `python  b_add_syntax_to_json_files.py  confs/literature_old.ini`
+* `b1_add_syntax_to_json_files.py` -- adds syntactic analyses to (json format) Text objects and creates morphosyntactic layers combining the (input) morphological annotations and newly created syntactic annotations. Name of the collection's configuration is required as an input argument, e.g.
+	* `python  b1_add_syntax_to_json_files.py  confs/literature_old.ini`
 	* By default, overwrites collection's old json files with new ones;
 
 * `c_write_syntax_to_vert_file.py` -- reads syntactic annotations from EstNLTK's json files and writes into ENC vert files. Requires name of the collection's configuration as an input argument, e.g.
@@ -53,7 +53,7 @@ Processing steps:
  
 #### Data parallelization
 
-Scripts `a_convert_vert_to_json_files.py` and `b_add_syntax_to_json_files.py` support document-index-wise data parallelization: you can launch multiple instances of script and give each instance a (non-overlapping) sub set of documents for processing.  
+Scripts `a_convert_vert_to_json_files.py` and `b1_add_syntax_to_json_files.py` support document-index-wise data parallelization: you can launch multiple instances of script and give each instance a (non-overlapping) sub set of documents for processing.  
 For this, use command line parameters `DIVISOR,REMAINDER` (both integers) to process only texts for which holds `text_id % DIVISOR == REMAINDER`. 
 
 Example: Launch two separate jobs for converting `balanced_and_reference_corpus` documents to json:
