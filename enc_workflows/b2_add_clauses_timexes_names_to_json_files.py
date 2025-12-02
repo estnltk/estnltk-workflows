@@ -36,6 +36,9 @@ from estnltk.taggers import TimexTagger
 from x_utils import collect_collection_subdirs
 from x_utils import find_processing_speed
 
+from x_utils import normalize_words_w_to_v
+from x_utils import clear_words_normalized_form
+
 from x_dct import detect_reference_time_from_meta
 from x_dct import get_reference_time_type
 
@@ -179,6 +182,10 @@ if __name__ == '__main__':
                 #
                 output_mode         = configuration['b2_output_mode']
                 output_file_infix   = configuration['b2_output_file_infix']
+                # Use words normalization (Optional)
+                normalize_w_to_v    = configuration['b2_normalize_w_to_v']
+                if normalize_w_to_v:
+                    print(f'Applying words normalization: w -> v.')
                 logger = None  # TODO
                 # Initialize tagger
                 input_words_layer = configuration.get('b2_input_words_layer', 'words')
@@ -189,8 +196,16 @@ if __name__ == '__main__':
                 morph_tagger = VabamorfTagger()
                 
                 # Main layers (must be preserved) 
-                clause_segmenter = ClauseSegmenter(output_layer=clauses_layer_name)
-                timex_tagger = TimexTagger(output_layer=timexes_layer_name)
+                clause_segmenter = ClauseSegmenter( output_layer=clauses_layer_name, \
+                                                    use_normalized_word_form=normalize_w_to_v )
+                if not normalize_w_to_v:
+                    # No words normalization
+                    timex_tagger = TimexTagger(output_layer=timexes_layer_name)
+                else:
+                    # Use words normalization
+                    from estnltk.taggers.standard.timexes.core_timex_tagger import CoreTimexTagger
+                    timex_tagger = CoreTimexTagger(output_layer=timexes_layer_name, \
+                                                   use_normalized_word_form=normalize_w_to_v)
                 nertagger = NerTagger(output_layer=ner_layer_name)
                 
                 print(f'Using {clause_segmenter.__class__.__name__}.' )
@@ -258,6 +273,12 @@ if __name__ == '__main__':
                                     text_obj.add_layer( cp_layer )
                                 except Exception as err:
                                     raise Exception(f'{compound_tokens_tagger.__class__.__name__}: Failed at processing document {fpath!r} due to an error: ') from err
+                                if normalize_w_to_v:
+                                    try:
+                                        # Apply words normalization (optional)
+                                        normalize_words_w_to_v( text_obj[input_words_layer], doc_path=fpath )
+                                    except Exception as err:
+                                        raise Exception(f'words normalization: Failed at processing document {fpath!r} due to an error: ') from err
                                 try:
                                     morph_tagger.tag(text_obj)
                                 except Exception as err:
@@ -316,6 +337,10 @@ if __name__ == '__main__':
                                 assert set(text_obj.layers) == set(original_layers).union(set([ clause_segmenter.output_layer, \
                                                                                                 timex_tagger.output_layer, \
                                                                                                 nertagger.output_layer ]))
+
+                                # Clear words normalization
+                                if normalize_w_to_v:
+                                    clear_words_normalized_form( text_obj[input_words_layer] )
 
                                 # Validate layer sizes (Optional)
                                 if validate_layer_sizes:

@@ -38,6 +38,7 @@ def detect_reference_time_from_meta( meta: dict ) -> str:
     Full date (yyyy-mm-dd) reference times can be parsed from metadata 
     in the following sub corpora:
     * EPL (newspaper Eesti Päevaleht);
+    * SLO (newspaper SL Õhtuleht);
     * PM (newspaper Postimees);
     * LE (newspaper Lääne Elu);
     * KR (magazine Kroonika);
@@ -48,6 +49,7 @@ def detect_reference_time_from_meta( meta: dict ) -> str:
     Partial date (yyyy-XX-XX or yyyy-mm-XX) reference times can be 
     parsed from metadata in the following sub corpora:
     * EE (newspaper Eesti Ekspress);
+    * LU (magazine Luup);
     
     Returns metadata as an ISO date string (yyyy-mm-dd), where 
     missing/incomplete values will be marked with Xs.

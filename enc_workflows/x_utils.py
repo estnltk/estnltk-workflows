@@ -671,3 +671,34 @@ def rename_layer(layer: Layer, renaming_map:dict=None):
         # Nothing to do here
         return layer
 
+
+# ======================================================================
+#  Word normalization (limited)
+# ======================================================================
+
+def normalize_words_w_to_v(words_layer: Layer, doc_path: str=None):
+    '''
+    Normalizes words_layer by changing 'w' -> 'v' 
+    (e.g. 'Jüripäew' -> 'Jüripäev', 'wõtavad' -> 'võtavad'). 
+    This can be useful for processing Old Estonian 
+    (documents written before ~1930). 
+    '''
+    if 'normalized_form' in words_layer.attributes:
+        for word_span in words_layer:
+            word_text = word_span.text
+            if 'w' in word_text.lower():
+                word_span.clear_annotations()
+                word_norm = word_text.replace('w', 'v')
+                word_norm = word_norm.replace('W', 'V')
+                word_span.add_annotation( normalized_form=word_norm )
+    else:
+        raise Exception(f'(!) Document {doc_path} is missing "normalized_form" in its "words" layer.')
+
+def clear_words_normalized_form(words_layer: Layer):
+    '''
+    Deletes all 'normalized_form' values from the words_layer.
+    '''
+    if 'normalized_form' in words_layer.attributes:
+        for word_span in words_layer:
+            word_span.clear_annotations()
+            word_span.add_annotation( normalized_form=None )
