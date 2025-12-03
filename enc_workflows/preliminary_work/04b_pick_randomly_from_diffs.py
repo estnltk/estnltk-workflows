@@ -43,7 +43,7 @@ if __name__ == '__main__':
     #
     #   literature_old\nc23_Literature_Old\0\0\doc.json::2
     #
-    pattern_diff_index = re.compile('^\s*([^:]+)::(\d+)\s*$')
+    pattern_diff_index = re.compile(r'^\s*([^:]+)::(\d+)\s*$')
     print('Collecting difference indexes ...')
     total_differences = []
     unique_diff_numbers = set()
