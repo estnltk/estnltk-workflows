@@ -183,7 +183,7 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
             #
             # Modifies words layer and adds "normalized_form" values w -> v during the preprocessing.
             # (e.g. 'Jüripäew' -> 'Jüripäev', 'wõtavad' -> 'võtavad')
-            # Note: this affects only timexes and clauses processing
+            # This affects directly timexes and clauses detection, but indirectly also named entity recognition
             #
             clean_conf['b2_normalize_w_to_v'] = config[section].getboolean('normalize_w_to_v', False)
         if section.startswith('write_syntax_to_vert'):

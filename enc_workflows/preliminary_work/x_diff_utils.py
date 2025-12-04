@@ -6,6 +6,8 @@
 #  https://github.com/soras/vk_ner_lrec_2022/blob/main/error_inspection/ner_diff_utils.py
 #  https://github.com/estnltk/estnltk-workflows/blob/master/diff_named_entities
 #  https://github.com/estnltk/estnltk-workflows/blob/master/diff_named_entities/ner_diff_utils.py
+#
+#  Requires estnltk v1.7.5+
 # ===========================================================================
 # ===========================================================================
 
@@ -366,7 +368,9 @@ class XDiffFinder:
                         old_layer_attr: str = 'nertag',
                         new_layer_attr: str = 'nertag',
                         output_format:  str = 'vertical',
-                        flat_layer_suffix: str = '_flat'):
+                        flat_layer_suffix: str = '_flat', 
+                        old_layer_gaps_strategy: str = None,
+                        new_layer_gaps_strategy: str = None):
         """Initiates XDiffFinder. A specification of comparable layers
            must be provided.
         
@@ -392,12 +396,26 @@ class XDiffFinder:
                Flat layers will be created from comparable layers before the 
                comparison, and this is the suffix that will be added to both
                flat layers. Defaults to '_flat';
+           :param old_layer_gaps_strategy: str
+               Specifies strategy for handling gaps inside enveloping spans 
+               of the old layer. By default, no strategy is applied. 
+               If you set `gaps_strategy='cut_out'`, then gaps inside spans 
+               (signalled by a non-whitspace string between two sub-spans) 
+               will be cut out, splitting spans correspondingly. 
+           :param new_layer_gaps_strategy: str
+               Specifies strategy for handling gaps inside enveloping spans 
+               of the new layer. By default, no strategy is applied. 
+               If you set `gaps_strategy='cut_out'`, then gaps inside spans 
+               (signalled by a non-whitspace string between two sub-spans) 
+               will be cut out, splitting spans correspondingly. 
         """
         self._flat_layer_suffix = '_flat'
         self.old_layer   = old_layer
         self.new_layer   = new_layer
         self.old_layer_attr = old_layer_attr
         self.new_layer_attr = new_layer_attr
+        self.old_layer_gaps_strategy = old_layer_gaps_strategy
+        self.new_layer_gaps_strategy = new_layer_gaps_strategy
         self.common_label    = '__label'
         self.ner_diff_tagger = DiffTagger( layer_a = old_layer+self._flat_layer_suffix,
                                            layer_b = new_layer+self._flat_layer_suffix,
@@ -455,10 +473,12 @@ class XDiffFinder:
         flat_b_name = self.new_layer+self._flat_layer_suffix
         old_layer_flat = flatten( text[self.old_layer], flat_a_name, 
                                   output_attributes=[self.common_label], 
-                                  attribute_mapping=[(self.old_layer_attr, self.common_label)] )
+                                  attribute_mapping=[(self.old_layer_attr, self.common_label)],
+                                  gaps_strategy = self.old_layer_gaps_strategy )
         new_layer_flat = flatten( text[self.new_layer], flat_b_name, 
                                   output_attributes=[self.common_label],  
-                                  attribute_mapping=[(self.new_layer_attr, self.common_label)] )
+                                  attribute_mapping=[(self.new_layer_attr, self.common_label)], 
+                                  gaps_strategy = self.new_layer_gaps_strategy )
         # Find raw differences
         diff_layer = self.ner_diff_tagger.make_layer( text, { flat_a_name:old_layer_flat,
                                                               flat_b_name:new_layer_flat } )
