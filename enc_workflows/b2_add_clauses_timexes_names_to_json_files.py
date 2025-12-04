@@ -26,6 +26,8 @@ from estnltk.converters import json_to_text
 from estnltk.converters import text_to_json
 from estnltk.converters import layer_to_json
 
+from estnltk_core.layer_operations import flatten
+
 from estnltk.taggers import PretokenizedTextCompoundTokensTagger
 from estnltk.taggers import VabamorfTagger
 
@@ -310,6 +312,19 @@ if __name__ == '__main__':
                                         # Add layer creation timestamp
                                         text_obj[timex_tagger.output_layer].meta['created_at'] = \
                                             (datetime.now()).strftime('%Y-%m-%d')
+                                    if normalize_w_to_v:
+                                        # If we've used CoreTimexTagger that envelops the 
+                                        # output layer around words layer, then flatten the 
+                                        # output layer
+                                        assert text_obj[timex_tagger.output_layer].enveloping is not None
+                                        enveloping_timexes = text_obj.pop_layer( timex_tagger.output_layer )
+                                        flat_timexes = flatten(enveloping_timexes, timex_tagger.output_layer, \
+                                                               disambiguation_strategy='pick_first')
+                                        flat_timexes.meta['document_creation_time'] = \
+                                            enveloping_timexes.meta['document_creation_time']
+                                        assert flat_timexes.enveloping is None
+                                        assert not flat_timexes.ambiguous
+                                        text_obj.add_layer( flat_timexes )
                                 except Exception as err:
                                     raise Exception(f'{timex_tagger.__class__.__name__}: Failed at processing document {fpath!r} due to an error: ') from err
                                 time_deltas['timexes'] += ( datetime.now() - timexes_start_time )
