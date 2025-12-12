@@ -12,7 +12,7 @@
 #   * '_norm_vs_unnorm__timexes_diffs.txt';
 #   * '_norm_vs_unnorm__clauses_diffs.txt';
 # 
-#   Requires estnltk v1.7.4+
+#   Requires estnltk v1.7.5+
 #
 import os, os.path, re, sys, warnings
 

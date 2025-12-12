@@ -102,6 +102,16 @@ def detect_reference_time_from_meta( meta: dict ) -> str:
                             month = month_name_to_number( (par_date.group(1)).lower() )
                             return f'{par_date.group(2)}-{month}-XX'
                         else:
+                            #
+                            # TODO: ENC Reference Corpus seems to have "unk" instead of "newspaperNumber", 
+                            #  which frequently causes DCT to be missed, e.g. 
+                            #  'filename': 'aja_luup_2000_05.ma', ... 'unk': 'Luup Nr. 5 (114), 6. märts 2000', ..., '_doc_id': 129027 
+                            #  'filename': 'aja_luup_1997_13.ma', ... 'unk': 'Luup Nr.13 (44) ; 23. juuni 1997', ..., '_doc_id': 173505
+                            #  'filename': 'aja_luup_1997_24.ma', ... 'unk': 'Luup Nr.24 (55) ; 24. november 1997', ..., '_doc_id': 173177
+                            # 
+                            # TODO: sometimes 'Luup' is missing from "newspaperNumber"/"unk" altogether:
+                            #  'filename': 'aja_luup_1998_24.ma', ... 'unk': 'Nr. 24 (81), 30. november 1998', ..., '_doc_id': 571878 
+                            # 
                             warnings.warn(f'(!) Failed to parse Luup doc creation date from {meta["newspaperNumber"]!r}')
                 else:
                     warnings.warn(f'(!) Failed to parse Luup doc creation date from {meta!r}')
