@@ -179,8 +179,7 @@ if __name__ == '__main__':
                 # Get output_mode
                 # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
                 # OVERWRITE -- overwrites the old json file with new content;
-                # Applies to both NEW_FILE and OVERWRITE:
-                # if `output_remove_morph` is set, then removes the input morph layer from the output document;
+                # NO_OUTPUT -- do not write output (for debugging only);
                 #
                 output_mode         = configuration['b2_output_mode']
                 output_file_infix   = configuration['b2_output_file_infix']
