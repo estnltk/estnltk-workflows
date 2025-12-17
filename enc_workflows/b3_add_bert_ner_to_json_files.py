@@ -126,7 +126,7 @@ if __name__ == '__main__':
                 add_layer_creation_time = configuration.get('b3_add_layer_creation_time', False)
                 validate_layer_sizes = configuration.get('b3_validate_layer_sizes', False)
                 #
-                # Get output_mode
+                # Get output_mode:
                 # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name;
                 # OVERWRITE -- overwrites the old json file with new content;
                 # NO_OUTPUT -- do not write output (for debugging only);
