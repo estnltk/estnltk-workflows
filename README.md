@@ -6,3 +6,4 @@
 * [enc_workflows](enc_workflows) -- workflows for importing and processing the Estonian National Corpus (_Eesti keele ühendkorpus_) with EstNLTK, and storing either as json files or as a PostgreSQL collection;
 * [koondkorpus_workflows](koondkorpus_workflows) -- workflows for importing and processing the Estonian Reference Corpus (_Eesti keele koondkorpus_) with EstNLTK, and storing either as json files or as a PostgreSQL collection;
 * [legacy](legacy) -- legacy workflows, no longer maintained nor supported;
+* [sonaveeb](sonaveeb) -- notebook for parsing sõnaveeb vrt file;
