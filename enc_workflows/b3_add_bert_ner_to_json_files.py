@@ -94,6 +94,8 @@ if __name__ == '__main__':
                 skipped_annotated_docs = 0 # documents that were already annotated
                 annotated_names      = 0
                 annotated_name_types = defaultdict(int)
+                total_exceeding_chunks = 0
+                total_exceeding_words  = 0
                 time_deltas = dict()
                 for sub_process in ['pre', 'names', 'post']:
                     time_deltas[sub_process] = timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, 
@@ -211,12 +213,16 @@ if __name__ == '__main__':
                                 time_deltas['pre'] += ( datetime.now() - pre_start_time )
                                 # Main layers
                                 names_start_time = datetime.now()
+                                processing_status = dict()
                                 try:
-                                    nertagger.tag(text_obj)
+                                    nertagger.tag(text_obj, status=processing_status)
                                     if add_layer_creation_time:
                                         # Add layer creation timestamp
                                         text_obj[nertagger.output_layers[0]].meta['created_at'] = \
                                             (datetime.now()).strftime('%Y-%m-%d')
+                                    # Find out the number of chunks and words exceeding the maximum length
+                                    total_exceeding_chunks += processing_status.get('chunks_exceeding_model_max_length', 0)
+                                    total_exceeding_words += processing_status.get('words_exceeding_model_max_length', 0)
                                 except Exception as err:
                                     raise Exception(f'{nertagger.__class__.__name__}: Failed at processing document {fpath!r} due to an error: ') from err
                                 time_deltas['names'] += ( datetime.now() - names_start_time )
@@ -275,6 +281,10 @@ if __name__ == '__main__':
                     print(f'    incl. split docs:  {annotated_split_docs}')
                     print(f' Annotated sentences:  {annotated_sentences}')
                     print(f'     Annotated words:  {annotated_words}')
+                    if total_exceeding_chunks > 0 and annotated_words > 0:
+                        print(f'     Chunks exceeding model max length:  {total_exceeding_chunks}')
+                        percentage = (100.0 * total_exceeding_words) / annotated_words
+                        print(f'      Words exceeding model max length:  {total_exceeding_words} ({percentage:.4f}%)')
                     print()
                     print(f'   Annotated names:    {annotated_names} | ( {_display_type_statistics(annotated_name_types)} )')
                     print()

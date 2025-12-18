@@ -245,6 +245,25 @@ class BertNerTagger(MultiLayerTagger):
             #print()
             # A) Create (possibly temporary) Bert tokens layer
             bert_tokens = self.tokenize_with_bert(Text(text_chunk), include_spanless=True)
+            if len(bert_tokens) > self.model_max_length:
+                # Find chunks exceeding model max length
+                status.setdefault('chunks_exceeding_model_max_length', 0)
+                status['chunks_exceeding_model_max_length'] += 1
+                # Find words exceeding model max length
+                if self.custom_words_layer is not None:
+                    j = self.model_max_length
+                    exceeding_start = None
+                    while j < len( bert_tokens ):
+                        if bert_tokens[j][0] is not None:
+                            exceeding_start = chunk_start + bert_tokens[j][0]
+                            break
+                        j += 1
+                    if exceeding_start is not None:
+                        words_layer = layers[self.custom_words_layer]
+                        exceeding_words = \
+                            [word.text for word in words_layer if exceeding_start <= word.start and word.end <= chunk_end]
+                        status.setdefault('words_exceeding_model_max_length', 0)
+                        status['words_exceeding_model_max_length'] += len(exceeding_words)
             for (start_span, end_span, token) in bert_tokens:
                 if (start_span, end_span) == (None, None):
                     # Skip special tokens (e.g. [CLS], [SEP])
