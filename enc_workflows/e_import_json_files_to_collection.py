@@ -92,9 +92,13 @@ if len(sys.argv) > 1:
             raise Exception('(!) Input file {!r} with unexpected extension, expected a configuration INI file.'.format(input_fname))
         if configuration is not None:
             # Get collection's parameters
-            collection_name = configuration['collection']
-            validate_database_access_parameters( configuration )
             logger.setLevel( configuration['db_insertion_log_level'] )
+            collection_name = configuration.get('db_collection_name', None)
+            if collection_name is None:
+                collection_name = configuration['collection']
+            else:
+                logger.info( f'Local collection name: {configuration["collection"]!r} | Database collection name: {collection_name!r}' )
+            validate_database_access_parameters( configuration )
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
             log_doc_completions = configuration.get('db_log_doc_completion', False)
             layer_renaming_map = configuration['layer_renaming_map']

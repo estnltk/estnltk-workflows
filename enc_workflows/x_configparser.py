@@ -273,6 +273,12 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                                  f'with overlapping names: {intersecting}')
             # Merge db access conf into main conf
             clean_conf.update( db_conf_dict )
+            # 
+            # Optional: overwrite local collection name with db_collection_name
+            # If not provided (default), then configuration['collection'] is used as the collection name 
+            # in Postgres' database. Otherwise, uses given 'db_collection_name' as the collection name. 
+            # Overwrite it only when you know what you are doing!
+            clean_conf['db_collection_name'] = config[section].get('db_collection_name', None)
             #
             # Parse parameters required for collection table creation
             #

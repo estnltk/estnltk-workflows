@@ -46,9 +46,13 @@ if len(sys.argv) > 1:
             raise Exception('(!) Input file {!r} with unexpected extension, expected a configuration INI file.'.format(input_fname))
         if configuration is not None:
             # Get collection's parameters
-            collection_name = configuration['collection']
-            collection_description = configuration.get('collection_description', None)
             logger.setLevel( configuration['db_insertion_log_level'] )
+            collection_name = configuration.get('db_collection_name', None)
+            if collection_name is None:
+                collection_name = configuration['collection']
+            else:
+                logger.info( f'Local collection name: {configuration["collection"]!r} | Database collection name: {collection_name!r}' )
+            collection_description = configuration.get('collection_description', None)
             validate_database_access_parameters( configuration )
             #print( configuration )
             # Connect to the storage
