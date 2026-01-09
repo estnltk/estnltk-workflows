@@ -86,8 +86,13 @@ if len(sys.argv) > 1:
                     logger.error( storage_exists_error_msg )
                     raise Exception(storage_exists_error_msg)
                 elif overwrite_existing and not update_existing:
-                    logger.info( f'Removing existing collection {collection_name!r}.' )
                     collection = storage[collection_name]
+                    if not collection._is_empty:
+                        choice = input( f'(!) Collection {collection_name!r} is not empty. '+\
+                                         'Do you really want to remove it? [Y/n]')
+                        if choice.lower() not in ['y', 'yes']:
+                            sys.exit()
+                    logger.info( f'Removing existing collection {collection_name!r}.' )
                     if metadata_table_exists(collection):
                         drop_collection_metadata_table(collection)
                     # Retrieve hash table layer names
