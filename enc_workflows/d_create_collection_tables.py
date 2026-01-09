@@ -1,5 +1,8 @@
 #
 #   Creates Postgres database tables for the given collection.
+#   If the collection already exists, then:
+#   * Use flag -r to remove the existing collection and start from the scratch.
+#   * Use flag -u to update the existing collection by adding new layers. 
 #   
 #   Requires name of a configuration INI file as an input argument. 
 #   
@@ -32,11 +35,19 @@ from x_db_utils import retrieve_collection_hash_table_names
 # Overwrite existing collection
 overwrite_existing = False
 
+# Update existing collection
+update_existing = False
+
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
     for s_arg in sys.argv[1:]:
         if s_arg.lower() in ['-r', '--overwrite']:
             overwrite_existing = True
+        elif s_arg.lower() in ['-u', '--update']:
+            update_existing = True
+    if overwrite_existing and update_existing:
+        raise Exception('(!) Cannot overwrite and update the collection at the same time. '+\
+                        'Use only one of the options -r or -u.')
     if os.path.isfile(input_fname):
         # Get & validate configuration parameters
         configuration = None
@@ -67,13 +78,14 @@ if len(sys.argv) > 1:
                                          create_schema_if_missing=configuration.get('create_schema_if_missing', False))
             # Check for the existence of the collection
             if collection_name in storage.collections:
-                if not overwrite_existing:
+                if not overwrite_existing and not update_existing:
                     storage_exists_error_msg = \
                         f'(!) Collection {collection_name!r} already exists in the database. '+\
-                        f'Use flag -r to remove the existing collection and start from the scratch.'
+                        f'Use flag -r to remove the existing collection and start from the scratch. '+\
+                        f'Use flag -u to update the existing collection by adding new layers. '
                     logger.error( storage_exists_error_msg )
                     raise Exception(storage_exists_error_msg)
-                else:
+                elif overwrite_existing and not update_existing:
                     logger.info( f'Removing existing collection {collection_name!r}.' )
                     collection = storage[collection_name]
                     if metadata_table_exists(collection):
@@ -85,7 +97,26 @@ if len(sys.argv) > 1:
                         if sentence_hash_table_exists(collection, layer_name=layer):
                             drop_sentence_hash_table(collection, layer_name=layer)
                     storage.delete_collection(collection_name)
-            
+                elif not overwrite_existing and update_existing:
+                    logger.info( f'Updating existing collection {collection_name!r}.' )
+                    collection = storage[collection_name]
+                    # Update collection's layers, add missing tables
+                    remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+                    create_collection_layer_tables(configuration, collection, 
+                                                   remove_sentences_hash_attr=remove_sentences_hash_attr, 
+                                                   sentences_layer='sentences', 
+                                                   sentences_hash_attr='sha256', 
+                                                   update=True)
+                    if not sentence_hash_table_exists(collection, layer_name='sentences'):
+                        # Create collection's sentences hash table
+                        create_sentence_hash_table(configuration, collection)
+                    if not metadata_table_exists(collection):
+                        # Create collection metadata table
+                        create_collection_metadata_table(configuration, collection)
+                    # Close connection
+                    storage.close()
+                    sys.exit()
+
             # Add new collection
             meta = {'src': 'str'} if configuration['add_src_as_meta'] else None
             if collection_description is None:

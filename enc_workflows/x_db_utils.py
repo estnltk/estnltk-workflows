@@ -44,10 +44,14 @@ from x_utils import rename_layer
 # ===================================================================
 
 def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgCollection',  layer_type: str = 'detached',
-                                    remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256' ):
+                                    remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256',
+                                    update:bool=False ):
     '''
     Creates layer tables to the `collection` based on layer templates loaded from collection's JSON files. 
     The `configuration` is used to find collection's subdirectories containing JSON files. 
+    
+    By default, throws an exception when encounters a layer that already exists in database. However, if 
+    flag `update` is switched on, then ignores existing layers and creates tables only for newly added layers. 
     
     This layer creation function is a stripped down version of PgCollection.add_layer (
     https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/collection.py#L757-L763 ), 
@@ -66,6 +70,14 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                                                      pg.PostgresStorage.TABLED_LAYER_TYPES))
     if layer_type != 'detached':
         raise NotImplementedError(f"Creating {layer_type} layers is currently not implemented.")
+    # Note: 
+    # * if the collection was just created and has no documents, then it only has structure_layers; 
+    # * if documents have already been inserted into the collection, then it has both structure_layers 
+    #   and filled_layers;
+    existing_structure_layers = list(collection._structure) if collection._structure else []
+    existing_filled_layers = collection.layers or []
+    if update and (len(existing_structure_layers) == 0 and len(existing_filled_layers) == 0):
+        raise Exception("Cannot update collection: no existing layers!")
     is_sparse = False
     meta = None
     # Load layer templates
@@ -86,10 +98,16 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
     
     # Create layer tables. Note we need to bypass the standard layer table 
     # creation mechanism, which forbids layer creation on empty collection
+    tables_created = 0
     for template in layer_templates:
         # Check for the existence of the layer
-        if collection.layers is not None and template.name in collection.layers:
-            raise Exception("The {!r} layer already exists in the collection {!r}.".format(template.name, collection.name))
+        if template.name in existing_structure_layers or template.name in existing_filled_layers:
+            if not update:
+                raise Exception("The {!r} layer already exists in the collection {!r}.".format(template.name, collection.name))
+            else:
+                # Skip an existing layer
+                logger.info('found layer {!r} in database'.format(template.name))
+                continue 
         conn = collection.storage.conn
         conn.commit()
         conn.autocommit = False
@@ -139,6 +157,7 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     index=Identifier('idx_%s__text_id' % layer_table),
                     layer_table=layer_identifier))
                 logger.debug(cur.query.decode())
+                tables_created += 1
 
             except Exception as layer_adding_error:
                 conn.rollback()
@@ -149,6 +168,10 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     conn.commit()
 
         logger.info('{} layer {!r} created from template'.format(layer_type, template.name))
+    if tables_created > 0:
+        logger.info('created {} new layer tables to the collection {!r}'.format(tables_created, collection.name))
+    elif update:
+        logger.info('no new layer tables created.')
 
 
 # ===================================================================
