@@ -279,6 +279,10 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
             # in Postgres' database. Otherwise, uses given 'db_collection_name' as the collection name. 
             # Overwrite it only when you know what you are doing!
             clean_conf['db_collection_name'] = config[section].get('db_collection_name', None)
+            if clean_conf['db_collection_name'] is not None:
+                if not clean_conf['db_collection_name'].isidentifier():
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["db_collection_name"]!r} '+\
+                                      'for parameter "db_collection_name". Expected a legitimate identifier.')
             #
             # Parse parameters required for collection table creation
             #

@@ -67,7 +67,7 @@ if len(sys.argv) > 1:
     focus_block = None
     for s_arg in sys.argv[1:]:
         # Get divisor & reminder for data parallelization
-        m = re.match('(\d+)[,:;](\d+)', s_arg)
+        m = re.match(r'(\d+)[,:;](\d+)', s_arg)
         if m:
             divisor = int(m.group(1))
             assert divisor > 0
