@@ -27,7 +27,6 @@ import warnings
 
 from tqdm import tqdm
 
-from estnltk import logger
 from estnltk.converters import json_to_text
 from estnltk.storage import postgres as pg
 
@@ -38,6 +37,9 @@ from x_configparser import parse_configuration
 from x_configparser import validate_database_access_parameters
 
 from x_db_utils import CollectionMultiTableInserter
+from x_logging import get_logger_with_tqdm_handler
+
+logger = get_logger_with_tqdm_handler()
 
 # Insert only first N documents [for debugging]
 insert_only_first = 0

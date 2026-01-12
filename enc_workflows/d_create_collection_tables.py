@@ -18,7 +18,6 @@ from datetime import datetime
 
 import warnings
 
-from estnltk import logger
 from estnltk.storage import postgres as pg
 
 from x_configparser import parse_configuration
@@ -31,6 +30,9 @@ from x_db_utils import sentence_hash_table_exists
 from x_db_utils import create_sentence_hash_table
 from x_db_utils import drop_sentence_hash_table
 from x_db_utils import retrieve_collection_hash_table_names
+from x_logging import get_logger_with_tqdm_handler
+
+logger = get_logger_with_tqdm_handler()
 
 # Overwrite existing collection
 overwrite_existing = False
@@ -89,7 +91,7 @@ if len(sys.argv) > 1:
                     collection = storage[collection_name]
                     if not collection._is_empty:
                         choice = input( f'(!) Collection {collection_name!r} is not empty. '+\
-                                         'Do you really want to remove it? [Y/n]')
+                                         'Do you really want to remove it? [y/N]')
                         if choice.lower() not in ['y', 'yes']:
                             sys.exit()
                     logger.info( f'Removing existing collection {collection_name!r}.' )

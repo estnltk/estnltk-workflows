@@ -17,7 +17,7 @@ from psycopg2.sql import DEFAULT as SQL_DEFAULT
 from psycopg2.sql import SQL, Identifier, Literal, Composed
 
 from estnltk import Text
-from estnltk import logger
+
 from estnltk.converters import text_to_json
 from estnltk.converters import layer_to_json
 
@@ -38,6 +38,9 @@ from x_utils import normalize_src
 from x_utils import SentenceHashRemover
 from x_utils import rename_layer
 
+from x_logging import get_logger_with_tqdm_handler
+
+logger = get_logger_with_tqdm_handler()
 
 # ===================================================================
 #    Collection's layer tables
