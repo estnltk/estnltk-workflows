@@ -4,10 +4,11 @@
 #   
 #   Requires name of a configuration INI file as an input argument. 
 #
-#   In order to update an existing collection, pass the -u on launching the script. Then, 
-#   the configuration must have at least one update section, starting with prefix 'database_update', 
-#   and defining a parameter "add_layers" (a list with new layers to be added to the collection). 
-#   If there are multiple update sections, then the last update section will be used. 
+#   In order to update an existing collection, pass the flag -u on launching the script. 
+#   Then the configuration must have at least one update section, starting with prefix 
+#   'database_update', and defining a parameter "add_layers" (a list with new layers to 
+#   be added to the collection). If there are multiple update sections, then the last 
+#   update section will be used. 
 #
 #   This script supports data parallelization: you can launch multiple instances 
 #   of the script and give each instance a (non-overlapping) sub set of data for 
@@ -55,6 +56,11 @@ insert_only_last = 0
 
 # Update existing collection
 update_existing = False
+
+# Sanity check: check that the first insertable document
+# is not in the database yet
+validate_first = True
+
 
 def sorted_vert_subdirs( configuration, vert_subdirs ):
     '''Sorts vert subdirs into the order in which vert files appear in the configuration file.'''
@@ -153,7 +159,7 @@ if len(sys.argv) > 1:
                 processed_docs = 0
                 processed_words = 0
                 processed_sentences = 0
-                global_doc_id = 0   # keeps track doc unique indexes over the whole collection
+                global_doc_id = 0   # keeps track of unique doc indexes over the whole collection
                 words_layer = 'words'
                 sentences_layer = 'sentences'
                 if not update_existing:
@@ -241,6 +247,17 @@ if len(sys.argv) > 1:
                                         text_obj.meta["_doc_vert_file"] = vert_file
                                         assert words_layer in text_obj.layers
                                         assert sentences_layer in text_obj.layers
+                                        if validate_first:
+                                            insertion_status = \
+                                                text_inserter.is_inserted(global_doc_id, detailed=False)
+                                            if insertion_status:
+                                                error_msg = \
+                                                    f'(!) Document with id={global_doc_id!r} has already been inserted into the collection.'
+                                                if update_existing:
+                                                    error_msg = \
+                                                        f'(!) Layers {target_layers} have already been inserted for the document with id={global_doc_id!r}.'
+                                                raise ValueError(error_msg)
+                                            validate_first = False
                                         text_inserter.insert(text_obj, global_doc_id)
                                     except Exception as err:
                                         raise Exception(f'Failed at processing document {fpath!r} due to an error: ') from err

@@ -858,6 +858,50 @@ class CollectionTextMultiTableInserter():
         self.text_insert_counter += 1
 
 
+    def is_inserted(self, key, detailed=False):
+        """Checks whether Text object with the given key has been inserted into 
+           tables targeted by this CollectionTextMultiTableInserter. 
+           Use this method to check whether a Text object has already been inserted. 
+           Note that by default, the method returns `True` even if the Text object 
+           has been partially inserted, i.e. inserted into some tables, but missing 
+           in others. Switch on the flag `detailed` to get a detailed overview of 
+           the insertion status: then the method will return a list of tuples 
+           (insertion_phase:str, status:bool). 
+        """
+        #
+        # Check insertion statuses of all different insertion phases
+        #
+        insertion_phases = []
+        insertion_statuses = []
+        with self.collection.storage.conn.cursor() as cursor:
+            for phase in self.insertion_phase_map.keys():
+                table_name = self.insertion_phase_map[phase][0]
+                table_identifier = [i[1] for i in self.insertable_tables if i[0] == table_name]
+                assert len(table_identifier) > 0
+                table_identifier = table_identifier[0]
+                query = None
+                if phase == '_collection':
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                   key=Literal(key))
+                elif phase == '_metadata':
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                elif phase == '_hashes':
+                    # TODO: this checks only for presence of a single sentence hash, does not 
+                    # assure that hashes of all sentences have been inserted
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                elif phase.startswith('_layer_'):
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                assert query is not None
+                cursor.execute( query )
+                result = cursor.fetchone()
+                insertion_phases.append(phase)
+                insertion_statuses.append( bool(result) )
+        return any(insertion_statuses) if not detailed else [(k,s) for k,s in zip(insertion_phases, insertion_statuses)]
+
+
     @staticmethod 
     def _insertable_text_object( text, add_src=True ):
         # Make new insertable Text that does not have any metadata
@@ -1067,3 +1111,37 @@ class CollectionLayerMultiTableInserter():
                 raise NotImplementedError(f'(!) Unimplemented phase: {phase!r}')
         # Mark document insertion completed
         self.text_insert_counter += 1
+
+
+    def is_inserted(self, key, detailed=False):
+        """Checks whether layers of the Text object with the given key have been 
+           inserted into tables targeted by this CollectionLayerMultiTableInserter. 
+           Use this method to check whether layers have already been inserted 
+           during the collection update. 
+           Note that by default, the method returns `True` even if the layers have 
+           have been partially inserted, i.e. some are inserted, others are missing. 
+           Switch on the flag `detailed` to get a detailed overview of the insertion 
+           status: then the method will return a list of tuples 
+           (insertion_phase:str, status:bool). 
+        """
+        #
+        # Check insertion statuses of all different insertion phases
+        #
+        insertion_phases = []
+        insertion_statuses = []
+        with self.collection.storage.conn.cursor() as cursor:
+            for phase in self.insertion_phase_map.keys():
+                table_name = self.insertion_phase_map[phase][0]
+                table_identifier = [i[1] for i in self.insertable_tables if i[0] == table_name]
+                assert len(table_identifier) > 0
+                table_identifier = table_identifier[0]
+                query = None
+                if phase.startswith('_layer_'):
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                assert query is not None
+                cursor.execute( query )
+                result = cursor.fetchone()
+                insertion_phases.append(phase)
+                insertion_statuses.append( bool(result) )
+        return any(insertion_statuses) if not detailed else [(k,s) for k,s in zip(insertion_phases, insertion_statuses)]
