@@ -1020,7 +1020,7 @@ class CollectionLayerMultiTableInserter():
             if not layer_exists_1 and not layer_exists_2:
                 missing_layers.append( target_layer )
         if missing_layers:
-            raise Exception(f'(!) Cannot add layers: no tables have been created for layers {missing_layers!r}.'+\
+            raise Exception(f'(!) Cannot add layers: no tables have been created for layers {missing_layers!r}. '+\
                              'Please use script d_create_collection_tables.py for creating layer tables.')
         assert len(collection_layers) == len(layers)
         self.layers = layers
