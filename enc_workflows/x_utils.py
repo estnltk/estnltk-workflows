@@ -637,7 +637,11 @@ def load_collection_layer_templates(configuration: dict):
             elif 'relations' in layer_dict.keys():
                 layer_dict['relations'] = []
             # Remove layer metadata
+            has_dct = 'document_creation_time' in layer_dict['meta']
             layer_dict['meta'] = {}
+            if has_dct:
+                # Set default DCT
+                layer_dict['meta']['document_creation_time'] = 'XXXX-XX-XX'
             templates.append( dict_to_layer(layer_dict) )
         return templates
     else:

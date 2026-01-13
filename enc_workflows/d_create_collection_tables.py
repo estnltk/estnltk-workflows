@@ -105,6 +105,9 @@ if len(sys.argv) > 1:
                             drop_sentence_hash_table(collection, layer_name=layer)
                     storage.delete_collection(collection_name)
                 elif not overwrite_existing and update_existing:
+                    # TODO: currently, the update automatically adds all layers that are 
+                    # not in the database. Make it possible to add layers selectively, 
+                    # following configuration's "database_update" section
                     logger.info( f'Updating existing collection {collection_name!r}.' )
                     collection = storage[collection_name]
                     # Update collection's layers, add missing tables

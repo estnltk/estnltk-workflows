@@ -7,6 +7,7 @@ import os, os.path
 import configparser
 import logging
 import warnings
+from collections import OrderedDict
 
 def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_vert_file:bool=False ):
     '''Parses ENC processing configuration parameters from the given INI file.'''
@@ -382,6 +383,36 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                 config[section].getint('db_insert_query_length_limit', 5000000) 
             assert clean_conf['db_insert_query_length_limit'] > 0, \
                 f"(!) db_insert_query_length_limit must be a positive integer, not {clean_conf['db_insert_query_length_limit']}"
+        if load_db_conf and section.startswith('database_update'):
+            #
+            # Load database update configuration
+            #
+            # Note: the configuration file can list multiple database update 
+            # sections, all of which should have distinctive suffixes, e.g. 
+            # "database_update_2025", "database_update_2026" etc.
+            # 
+            if 'db_updates' not in clean_conf.keys():
+                clean_conf['db_updates'] = OrderedDict()
+            if section in clean_conf['db_updates'].keys():
+                raise ValueError(f'Error in {conf_file}: duplicate database update section {section!r}. '+\
+                                  'Database update sections should have distinctive name suffixes. ')
+            # Add new database update section
+            clean_conf['db_updates'][section] = dict()
+            add_new_layers_string = config[section].get('add_layers', None)
+            if isinstance(add_new_layers_string, str):
+                #
+                # Insert the following new layers
+                #
+                new_layers = [f.strip() for f in re.split('[;,]', add_new_layers_string) if len(f.strip()) > 0]
+                if len(new_layers) == 0:
+                    raise ValueError(f'Error in {conf_file}: section {section!r} parameter "add_layers" must not be empty. '+\
+                                      'In order to update the collection by adding new layers, please list names of layers inside '+\
+                                      'the parameter "add_layers". ')
+                clean_conf['db_updates'][section]['add_layers'] = new_layers
+            if len(clean_conf['db_updates'][section].keys()) == 0:
+                raise ValueError(f'Error in {conf_file}: section {section!r} is empty. '+\
+                                  'In order to define an update of the collection, use parameter "add_layers" to '+\
+                                  'list new layers that will be added to the collection. ')
 
     if 'collection' in clean_conf.keys():
         # Return collected configuration

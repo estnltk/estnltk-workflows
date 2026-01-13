@@ -4,6 +4,11 @@
 #   
 #   Requires name of a configuration INI file as an input argument. 
 #
+#   In order to update an existing collection, pass the -u on launching the script. Then, 
+#   the configuration must have at least one update section, starting with prefix 'database_update', 
+#   and defining a parameter "add_layers" (a list with new layers to be added to the collection). 
+#   If there are multiple update sections, then the last update section will be used. 
+#
 #   This script supports data parallelization: you can launch multiple instances 
 #   of the script and give each instance a (non-overlapping) sub set of data for 
 #   processing. Use command line parameters `divisor,remainder` to process only 
@@ -36,7 +41,8 @@ from x_utils import find_processing_speed
 from x_configparser import parse_configuration
 from x_configparser import validate_database_access_parameters
 
-from x_db_utils import CollectionMultiTableInserter
+from x_db_utils import CollectionTextMultiTableInserter
+from x_db_utils import CollectionLayerMultiTableInserter
 from x_logging import get_logger_with_tqdm_handler
 
 logger = get_logger_with_tqdm_handler()
@@ -46,6 +52,9 @@ insert_only_first = 0
 
 # Insert only last N documents [for debugging]
 insert_only_last = 0
+
+# Update existing collection
+update_existing = False
 
 def sorted_vert_subdirs( configuration, vert_subdirs ):
     '''Sorts vert subdirs into the order in which vert files appear in the configuration file.'''
@@ -85,6 +94,8 @@ if len(sys.argv) > 1:
         elif s_arg[0]=='-' and s_arg[1:].isdigit():
             insert_only_last = int(s_arg)
             assert insert_only_last < 0
+        elif s_arg.lower() in ['-u', '--update']:
+            update_existing = True
     if os.path.isfile(input_fname):
         # Get & validate configuration parameters
         configuration = None
@@ -110,6 +121,17 @@ if len(sys.argv) > 1:
             vert_subdirs = collect_collection_subdirs(configuration['collection'], only_first_level=True, full_paths=False)
             if len(vert_subdirs) == 0:
                 warnings.warn(f'(!) No document subdirectories found from collection dir {configuration["collection"]!r}')
+            target_layers = None
+            if update_existing:
+                # Get database updates
+                db_updates_conf = configuration.get('db_updates', None)
+                if db_updates_conf is None or len(db_updates_conf.keys()) == 0:
+                    raise Exception(f'(!) Configuration file {input_fname!r} does not define any database updates.')
+                # Take the last / latest update
+                # TODO: make it possible to pass name of the target update as a command line parameter
+                last_update = next(reversed(db_updates_conf.keys()))
+                target_layers = db_updates_conf[last_update].get('add_layers', None)
+                assert target_layers is not None and len(target_layers) > 0
             # Connect to the storage
             storage = pg.PostgresStorage(host=configuration.get('db_host', None),
                                          port=configuration.get('db_port', None),
@@ -134,14 +156,27 @@ if len(sys.argv) > 1:
                 global_doc_id = 0   # keeps track doc unique indexes over the whole collection
                 words_layer = 'words'
                 sentences_layer = 'sentences'
-                with CollectionMultiTableInserter( collection,
-                                                   buffer_size=db_insert_buffer_size, 
-                                                   query_length_limit=db_insert_query_length_limit, 
-                                                   remove_sentences_hash_attr=remove_sentences_hash_attr, 
-                                                   sentences_layer=sentences_layer, 
-                                                   sentences_hash_attr='sha256', 
-                                                   layer_renaming_map=layer_renaming_map,
-                                                   log_doc_completions=log_doc_completions) as text_inserter:
+                if not update_existing:
+                    # Insert new Text objects and new base layers
+                    logger.info('Working in NEW mode: inserting new documents and base layers to the collection.')
+                    text_inserter = CollectionTextMultiTableInserter( collection,
+                                                                      buffer_size=db_insert_buffer_size, 
+                                                                      query_length_limit=db_insert_query_length_limit, 
+                                                                      remove_sentences_hash_attr=remove_sentences_hash_attr, 
+                                                                      sentences_layer=sentences_layer, 
+                                                                      sentences_hash_attr='sha256', 
+                                                                      layer_renaming_map=layer_renaming_map,
+                                                                      log_doc_completions=log_doc_completions )
+                else:
+                    # Add new layers to existing Text objects
+                    logger.info(f'Working in UPDATE mode: inserting layers {target_layers} to existing documents.')
+                    text_inserter = CollectionLayerMultiTableInserter( collection, 
+                                                                       target_layers, 
+                                                                       buffer_size=db_insert_buffer_size, 
+                                                                       query_length_limit=db_insert_query_length_limit, 
+                                                                       layer_renaming_map=layer_renaming_map,
+                                                                       log_doc_completions=log_doc_completions )
+                with text_inserter:
                     for vert_subdir in sorted_vert_subdirs( configuration, vert_subdirs ):
                         # Start processing one vert_file / vert_subdir
                         subdir_start_time = datetime.now()
@@ -216,9 +251,10 @@ if len(sys.argv) > 1:
                         print(f'Processing {vert_subdir} took {datetime.now()-subdir_start_time}.')
                 # Complete the whole collection
                 if processed_docs > 0:
+                    activity = 'Inserted' if not update_existing else ' Updated'
                     print()
                     print(f' =={collection_name}==')
-                    print(f' Inserted documents:  {processed_docs}')
+                    print(f' {activity} documents:  {processed_docs}')
                     print(f'          sentences:  {processed_sentences}')
                     print(f'              words:  {processed_words}')
                     print()
