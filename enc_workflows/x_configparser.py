@@ -408,7 +408,7 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                     raise ValueError(f'Error in {conf_file}: section {section!r} parameter "add_layers" must not be empty. '+\
                                       'In order to update the collection by adding new layers, please list names of layers inside '+\
                                       'the parameter "add_layers". ')
-                clean_conf['db_updates'][section]['add_layers'] = new_layers
+                clean_conf['db_updates'][section]['add_layers'] = list(OrderedDict.fromkeys(new_layers))
             if len(clean_conf['db_updates'][section].keys()) == 0:
                 raise ValueError(f'Error in {conf_file}: section {section!r} is empty. '+\
                                   'In order to define an update of the collection, use parameter "add_layers" to '+\

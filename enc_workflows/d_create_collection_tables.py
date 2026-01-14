@@ -91,7 +91,7 @@ if len(sys.argv) > 1:
                     collection = storage[collection_name]
                     if not collection._is_empty:
                         choice = input( f'(!) Collection {collection_name!r} is not empty. '+\
-                                         'Do you really want to remove it? [y/N]')
+                                         'Do you really want to remove it and start from the scratch? [y/N]')
                         if choice.lower() not in ['y', 'yes']:
                             sys.exit()
                     logger.info( f'Removing existing collection {collection_name!r}.' )
@@ -105,10 +105,17 @@ if len(sys.argv) > 1:
                             drop_sentence_hash_table(collection, layer_name=layer)
                     storage.delete_collection(collection_name)
                 elif not overwrite_existing and update_existing:
-                    # TODO: currently, the update automatically adds all layers that are 
-                    # not in the database. Make it possible to add layers selectively, 
-                    # following configuration's "database_update" section
-                    logger.info( f'Updating existing collection {collection_name!r}.' )
+                    # Get database updates
+                    db_updates_conf = configuration.get('db_updates', None)
+                    if db_updates_conf is None or len(db_updates_conf.keys()) == 0:
+                        raise Exception(f'(!) Configuration file {input_fname!r} does not define any database updates.')
+                    # Take the last / latest update
+                    # TODO: make it possible to pass name of the target update as a command line parameter
+                    last_update = next(reversed(db_updates_conf.keys()))
+                    target_layers = db_updates_conf[last_update].get('add_layers', None)
+                    assert target_layers is not None and len(target_layers) > 0, \
+                        f'(!) Configuration file {input_fname!r} does not define any layers to be updated.'
+                    logger.info( f'Updating existing collection {collection_name!r} with layers {target_layers}.' )
                     collection = storage[collection_name]
                     # Update collection's layers, add missing tables
                     remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
@@ -116,13 +123,8 @@ if len(sys.argv) > 1:
                                                    remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                                    sentences_layer='sentences', 
                                                    sentences_hash_attr='sha256', 
-                                                   update=True)
-                    if not sentence_hash_table_exists(collection, layer_name='sentences'):
-                        # Create collection's sentences hash table
-                        create_sentence_hash_table(configuration, collection)
-                    if not metadata_table_exists(collection):
-                        # Create collection metadata table
-                        create_collection_metadata_table(configuration, collection)
+                                                   update=True,
+                                                   update_layers=target_layers)
                     # Close connection
                     storage.close()
                     sys.exit()

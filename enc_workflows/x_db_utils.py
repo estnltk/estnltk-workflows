@@ -48,13 +48,14 @@ logger = get_logger_with_tqdm_handler()
 
 def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgCollection',  layer_type: str = 'detached',
                                     remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256',
-                                    update:bool=False ):
+                                    update:bool=False, update_layers:'List[str]'=None ):
     '''
     Creates layer tables to the `collection` based on layer templates loaded from collection's JSON files. 
     The `configuration` is used to find collection's subdirectories containing JSON files. 
     
     By default, throws an exception when encounters a layer that already exists in database. However, if 
-    flag `update` is switched on, then ignores existing layers and creates tables only for newly added layers. 
+    flag `update` is switched on, then ignores existing layers and creates tables only for layers listed 
+    in `update_layers`. In that case, `update_layers` must be a non-empty list containing layer names. 
     
     This layer creation function is a stripped down version of PgCollection.add_layer (
     https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/collection.py#L757-L763 ), 
@@ -79,8 +80,11 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
     #   and filled_layers;
     existing_structure_layers = list(collection._structure) if collection._structure else []
     existing_filled_layers = collection.layers or []
-    if update and (len(existing_structure_layers) == 0 and len(existing_filled_layers) == 0):
-        raise Exception("Cannot update collection: no existing layers!")
+    if update:
+        if (len(existing_structure_layers) == 0 and len(existing_filled_layers) == 0):
+            raise Exception("Cannot update collection: no existing layers!")
+        if update_layers is None or len(update_layers) == 0:
+            raise Exception("Cannot update collection: no update_layers specified!")
     is_sparse = False
     meta = None
     # Load layer templates
@@ -94,11 +98,46 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     tuple( [a for a in template.attributes if a != sentences_hash_attr] )
                 assert sentences_hash_attr not in template.attributes
 
+    if update_layers and len(update_layers) > 0:
+        # Keep only templates of those layers that need to be updated
+        new_layer_names = []
+        new_layer_templates = []
+        for template in layer_templates:
+            layer_name = template.name
+            renamed_layer_name = layer_name
+            if configuration['layer_renaming_map'] is not None:
+                # Apply layer renaming
+                renamed_layer_name = (configuration['layer_renaming_map']).get(layer_name, \
+                                                                               layer_name)
+            if layer_name in update_layers or renamed_layer_name in update_layers:
+                new_layer_names.append( renamed_layer_name )
+                new_layer_templates.append( template )
+        # Check for missing templates
+        missing_templates = []
+        for updt_layer in update_layers:
+            if updt_layer is None or len(updt_layer) == 0:
+                continue
+            layer_name = updt_layer
+            renamed_layer_name = updt_layer
+            if configuration['layer_renaming_map'] is not None:
+                # Apply layer renaming
+                renamed_layer_name = (configuration['layer_renaming_map']).get(layer_name, \
+                                                                               layer_name)
+            if layer_name not in new_layer_names and renamed_layer_name not in new_layer_names:
+                if layer_name != renamed_layer_name and renamed_layer_name is not None:
+                    missing_templates.append( f'{layer_name}/{renamed_layer_name}' )
+                else:
+                    missing_templates.append( f'{layer_name}' )
+        if missing_templates:
+            raise Exception(f"Cannot update collection: JSON files are missing layers: {missing_templates!r}")
+        # Update layer_templates
+        layer_templates = new_layer_templates
+
     if configuration['layer_renaming_map'] is not None:
-        # Rename layers
+        # Apply layer renaming
         for template in layer_templates:
             rename_layer(template, renaming_map=configuration['layer_renaming_map'])
-    
+
     # Create layer tables. Note we need to bypass the standard layer table 
     # creation mechanism, which forbids layer creation on empty collection
     tables_created = 0
@@ -108,8 +147,8 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
             if not update:
                 raise Exception("The {!r} layer already exists in the collection {!r}.".format(template.name, collection.name))
             else:
-                # Skip an existing layer
-                logger.info('found layer {!r} in database'.format(template.name))
+                # Skip an existing layer 
+                logger.info('layer {!r} is already in database'.format(template.name))
                 continue 
         conn = collection.storage.conn
         conn.commit()
