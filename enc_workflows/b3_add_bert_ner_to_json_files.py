@@ -71,6 +71,13 @@ def _display_time_delta_statistics(time_deltas_dict):
     return ', '.join(str_to_join)
 
 
+def get_proportion_str( part, total, add_parentheses=False ):
+    '''Calculates percentage `part` of `total` and returns as string.'''
+    percent = (part*100.0)/total if total > 0 else 0.0
+    percent_str = '{:.2f}%'.format(percent)
+    return '('+percent_str+')' if add_parentheses else percent_str
+
+
 # Annotate only these documents, skip others
 target_doc_files = [ 'doc.json' ]
 
@@ -93,6 +100,7 @@ if __name__ == '__main__':
                 annotated_split_docs = 0
                 skipped_annotated_docs = 0 # documents that were already annotated
                 annotated_names      = 0
+                empty_layer_count    = defaultdict(int)
                 annotated_name_types = defaultdict(int)
                 total_exceeding_chunks = 0
                 total_exceeding_words  = 0
@@ -249,6 +257,10 @@ if __name__ == '__main__':
                                 annotated_names     += len( text_obj[nertagger.output_layers[0]] )
                                 # Records detailed statistics
                                 _record_annotated_name_types( text_obj[nertagger.output_layers[0]], annotated_name_types )
+                                # Record empty layer counts
+                                for target_layer in [nertagger.output_layers[0]]:
+                                    if len( text_obj[target_layer] ) == 0:
+                                        empty_layer_count[target_layer] += 1
 
                                 # Finally, save the results
                                 if output_mode == 'NEW_FILE':
@@ -286,7 +298,9 @@ if __name__ == '__main__':
                         percentage = (100.0 * total_exceeding_words) / annotated_words
                         print(f'      Words exceeding model max length:  {total_exceeding_words} ({percentage:.4f}%)')
                     print()
-                    print(f'   Annotated names:    {annotated_names} | ( {_display_type_statistics(annotated_name_types)} )')
+                    print(f'   Annotated names:    {annotated_names} |'+\
+                          f' ( {_display_type_statistics(annotated_name_types)} ) |'+\
+                          f' empty layers: ', get_proportion_str( empty_layer_count.get(nertagger.output_layers[0], 0), annotated_docs ) )
                     print()
                     print(f'  Total time elapsed:  {datetime.now()-total_start_time}')
                     if annotated_words > 0:

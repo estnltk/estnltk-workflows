@@ -111,6 +111,13 @@ def _display_time_delta_statistics(time_deltas_dict):
     return ', '.join(str_to_join)
 
 
+def get_proportion_str( part, total, add_parentheses=False ):
+    '''Calculates percentage `part` of `total` and returns as string.'''
+    percent = (part*100.0)/total if total > 0 else 0.0
+    percent_str = '{:.2f}%'.format(percent)
+    return '('+percent_str+')' if add_parentheses else percent_str
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         input_fname = sys.argv[1]
@@ -132,6 +139,7 @@ if __name__ == '__main__':
                 annotated_clauses = 0
                 annotated_timexes = 0
                 annotated_names   = 0
+                empty_layer_count      = defaultdict(int)
                 annotated_clause_types = defaultdict(int)
                 annotated_timex_types  = defaultdict(int)
                 annotated_name_types   = defaultdict(int)
@@ -375,6 +383,12 @@ if __name__ == '__main__':
                                 annotated_clauses   += len( text_obj[clause_segmenter.output_layer] )
                                 annotated_timexes   += len( text_obj[timex_tagger.output_layer] )
                                 annotated_names     += len( text_obj[nertagger.output_layer] )
+                                # Record empty layer counts
+                                for target_layer in [clause_segmenter.output_layer, 
+                                                     timex_tagger.output_layer, 
+                                                     nertagger.output_layer]:
+                                    if len( text_obj[target_layer] ) == 0:
+                                        empty_layer_count[target_layer] += 1
                                 
                                 # Records detailed statistics
                                 _record_annotated_clause_types( text_obj[clause_segmenter.output_layer], annotated_clause_types )
@@ -413,9 +427,15 @@ if __name__ == '__main__':
                     print(f' Annotated sentences:  {annotated_sentences}')
                     print(f'     Annotated words:  {annotated_words}')
                     print()
-                    print(f'   Annotated clauses:  {annotated_clauses} | ( {_display_type_statistics(annotated_clause_types)} )')
-                    print(f'   Annotated names:    {annotated_names} | ( {_display_type_statistics(annotated_name_types)} )')
-                    print(f'   Annotated timexes:  {annotated_timexes} | ( {_display_type_statistics(annotated_timex_types)} )')
+                    print(f'   Annotated clauses:  {annotated_clauses} |'+\
+                          f' ( {_display_type_statistics(annotated_clause_types)} ) |'+\
+                          f' empty layers: ', get_proportion_str( empty_layer_count.get(clause_segmenter.output_layer, 0), annotated_docs ) )
+                    print(f'   Annotated names:    {annotated_names} |'+\
+                          f' ( {_display_type_statistics(annotated_name_types)} ) |'+\
+                          f' empty layers: ', get_proportion_str( empty_layer_count.get(nertagger.output_layer, 0), annotated_docs ) )
+                    print(f'   Annotated timexes:  {annotated_timexes} |'+\
+                          f' ( {_display_type_statistics(annotated_timex_types)} ) |'+\
+                          f' empty layers: ', get_proportion_str( empty_layer_count.get(timex_tagger.output_layer, 0), annotated_docs ) )
                     print(f'     Found DCT types:  {_display_type_statistics(annotated_dct_types)}')
                     print()
                     print(f'  Total time elapsed:  {datetime.now()-total_start_time}')
