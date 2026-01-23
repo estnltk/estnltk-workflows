@@ -17,7 +17,7 @@ from psycopg2.sql import DEFAULT as SQL_DEFAULT
 from psycopg2.sql import SQL, Identifier, Literal, Composed
 
 from estnltk import Text
-from estnltk import logger
+
 from estnltk.converters import text_to_json
 from estnltk.converters import layer_to_json
 
@@ -38,16 +38,24 @@ from x_utils import normalize_src
 from x_utils import SentenceHashRemover
 from x_utils import rename_layer
 
+from x_logging import get_logger_with_tqdm_handler
+
+logger = get_logger_with_tqdm_handler()
 
 # ===================================================================
 #    Collection's layer tables
 # ===================================================================
 
 def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgCollection',  layer_type: str = 'detached',
-                                    remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256' ):
+                                    remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256',
+                                    update:bool=False, update_layers:'List[str]'=None ):
     '''
     Creates layer tables to the `collection` based on layer templates loaded from collection's JSON files. 
     The `configuration` is used to find collection's subdirectories containing JSON files. 
+    
+    By default, throws an exception when encounters a layer that already exists in database. However, if 
+    flag `update` is switched on, then ignores existing layers and creates tables only for layers listed 
+    in `update_layers`. In that case, `update_layers` must be a non-empty list containing layer names. 
     
     This layer creation function is a stripped down version of PgCollection.add_layer (
     https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/collection.py#L757-L763 ), 
@@ -66,6 +74,17 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                                                      pg.PostgresStorage.TABLED_LAYER_TYPES))
     if layer_type != 'detached':
         raise NotImplementedError(f"Creating {layer_type} layers is currently not implemented.")
+    # Note: 
+    # * if the collection was just created and has no documents, then it only has structure_layers; 
+    # * if documents have already been inserted into the collection, then it has both structure_layers 
+    #   and filled_layers;
+    existing_structure_layers = list(collection._structure) if collection._structure else []
+    existing_filled_layers = collection.layers or []
+    if update:
+        if (len(existing_structure_layers) == 0 and len(existing_filled_layers) == 0):
+            raise Exception("Cannot update collection: no existing layers!")
+        if update_layers is None or len(update_layers) == 0:
+            raise Exception("Cannot update collection: no update_layers specified!")
     is_sparse = False
     meta = None
     # Load layer templates
@@ -79,17 +98,58 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     tuple( [a for a in template.attributes if a != sentences_hash_attr] )
                 assert sentences_hash_attr not in template.attributes
 
+    if update_layers and len(update_layers) > 0:
+        # Keep only templates of those layers that need to be updated
+        new_layer_names = []
+        new_layer_templates = []
+        for template in layer_templates:
+            layer_name = template.name
+            renamed_layer_name = layer_name
+            if configuration['layer_renaming_map'] is not None:
+                # Apply layer renaming
+                renamed_layer_name = (configuration['layer_renaming_map']).get(layer_name, \
+                                                                               layer_name)
+            if layer_name in update_layers or renamed_layer_name in update_layers:
+                new_layer_names.append( renamed_layer_name )
+                new_layer_templates.append( template )
+        # Check for missing templates
+        missing_templates = []
+        for updt_layer in update_layers:
+            if updt_layer is None or len(updt_layer) == 0:
+                continue
+            layer_name = updt_layer
+            renamed_layer_name = updt_layer
+            if configuration['layer_renaming_map'] is not None:
+                # Apply layer renaming
+                renamed_layer_name = (configuration['layer_renaming_map']).get(layer_name, \
+                                                                               layer_name)
+            if layer_name not in new_layer_names and renamed_layer_name not in new_layer_names:
+                if layer_name != renamed_layer_name and renamed_layer_name is not None:
+                    missing_templates.append( f'{layer_name}/{renamed_layer_name}' )
+                else:
+                    missing_templates.append( f'{layer_name}' )
+        if missing_templates:
+            raise Exception(f"Cannot update collection: JSON files are missing layers: {missing_templates!r}")
+        # Update layer_templates
+        layer_templates = new_layer_templates
+
     if configuration['layer_renaming_map'] is not None:
-        # Rename layers
+        # Apply layer renaming
         for template in layer_templates:
             rename_layer(template, renaming_map=configuration['layer_renaming_map'])
-    
+
     # Create layer tables. Note we need to bypass the standard layer table 
     # creation mechanism, which forbids layer creation on empty collection
+    tables_created = 0
     for template in layer_templates:
         # Check for the existence of the layer
-        if collection.layers is not None and template.name in collection.layers:
-            raise Exception("The {!r} layer already exists in the collection {!r}.".format(template.name, collection.name))
+        if template.name in existing_structure_layers or template.name in existing_filled_layers:
+            if not update:
+                raise Exception("The {!r} layer already exists in the collection {!r}.".format(template.name, collection.name))
+            else:
+                # Skip an existing layer 
+                logger.info('layer {!r} is already in database'.format(template.name))
+                continue 
         conn = collection.storage.conn
         conn.commit()
         conn.autocommit = False
@@ -139,6 +199,7 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     index=Identifier('idx_%s__text_id' % layer_table),
                     layer_table=layer_identifier))
                 logger.debug(cur.query.decode())
+                tables_created += 1
 
             except Exception as layer_adding_error:
                 conn.rollback()
@@ -149,6 +210,10 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     conn.commit()
 
         logger.info('{} layer {!r} created from template'.format(layer_type, template.name))
+    if tables_created > 0:
+        logger.info('created {} new layer tables to the collection {!r}'.format(tables_created, collection.name))
+    elif update:
+        logger.info('no new layer tables created.')
 
 
 # ===================================================================
@@ -612,7 +677,7 @@ class BufferedMultiTableInsert():
 
 
 
-class CollectionMultiTableInserter():
+class CollectionTextMultiTableInserter():
     '''A version of CollectionTextObjectInserter that allows to insert a Text object into all tables of 
        the collection. 
        Updates simultaneously collection base table, collection detached layer tables, metadata table, 
@@ -769,24 +834,24 @@ class CollectionMultiTableInserter():
                 new_text_meta = None
                 if self.add_meta_src:
                     new_text, new_text_meta = \
-                        CollectionMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
+                        CollectionTextMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
                     row = [ key, text_to_json(new_text), False, new_text_meta.get('src', SQL_DEFAULT) ]
                 else:
                     new_text = \
-                        CollectionMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
+                        CollectionTextMultiTableInserter._insertable_text_object(text, add_src=self.add_meta_src)
                     row = [ key, text_to_json(new_text), False ]
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
             elif phase == '_metadata':
                 # Insert Text's metadata
                 row = [ SQL_DEFAULT, key ]
-                new_text_meta = CollectionMultiTableInserter._insertable_metadata(text, table_columns)
+                new_text_meta = CollectionTextMultiTableInserter._insertable_metadata(text, table_columns)
                 row.extend(new_text_meta)
                 assert len(table_columns) == len(row)
                 self.buffered_inserter.insert( table_name, row )
             elif phase == '_hashes':
                 # Insert Text's sentence hashes
-                sent_hashes = CollectionMultiTableInserter._insertable_hashes(text, 
+                sent_hashes = CollectionTextMultiTableInserter._insertable_hashes(text, 
                                                                               layer=self.sentences_layer, 
                                                                               hash_attr=self.sentences_hash_attr)
                 for [sent_id, sent_hash] in sent_hashes:
@@ -830,6 +895,50 @@ class CollectionMultiTableInserter():
                 raise NotImplementedError(f'(!) Unimplemented phase: {phase!r}')
         # Mark document insertion completed
         self.text_insert_counter += 1
+
+
+    def is_inserted(self, key, detailed=False):
+        """Checks whether Text object with the given key has been inserted into 
+           tables targeted by this CollectionTextMultiTableInserter. 
+           Use this method to check whether a Text object has already been inserted. 
+           Note that by default, the method returns `True` even if the Text object 
+           has been partially inserted, i.e. inserted into some tables, but missing 
+           in others. Switch on the flag `detailed` to get a detailed overview of 
+           the insertion status: then the method will return a list of tuples 
+           (insertion_phase:str, status:bool). 
+        """
+        #
+        # Check insertion statuses of all different insertion phases
+        #
+        insertion_phases = []
+        insertion_statuses = []
+        with self.collection.storage.conn.cursor() as cursor:
+            for phase in self.insertion_phase_map.keys():
+                table_name = self.insertion_phase_map[phase][0]
+                table_identifier = [i[1] for i in self.insertable_tables if i[0] == table_name]
+                assert len(table_identifier) > 0
+                table_identifier = table_identifier[0]
+                query = None
+                if phase == '_collection':
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                   key=Literal(key))
+                elif phase == '_metadata':
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                elif phase == '_hashes':
+                    # TODO: this checks only for presence of a single sentence hash, does not 
+                    # assure that hashes of all sentences have been inserted
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                elif phase.startswith('_layer_'):
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                assert query is not None
+                cursor.execute( query )
+                result = cursor.fetchone()
+                insertion_phases.append(phase)
+                insertion_statuses.append( bool(result) )
+        return any(insertion_statuses) if not detailed else [(k,s) for k,s in zip(insertion_phases, insertion_statuses)]
 
 
     @staticmethod 
@@ -878,3 +987,200 @@ class CollectionMultiTableInserter():
             sentence_hashes.append( [sent_id, sent_hash] )
         return sentence_hashes
 
+
+
+class CollectionLayerMultiTableInserter():
+    '''A version of CollectionDetachedLayerInserter that allows to insert multiple layers of a Text object 
+       into all layer tables of the collection. 
+       Updates simultaneously all target detached layer tables.
+       
+       Builds upon: 
+       https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/collection_text_object_inserter.py
+       https://github.com/estnltk/estnltk/blob/ab676f28df06cabee3b7e1f17c9eeaa1f635831d/estnltk/estnltk/storage/postgres/context_managers/collection_detached_layer_inserter.py
+    '''
+
+    def __init__(self, collection, layers, buffer_size=10000, query_length_limit=5000000, 
+                       layer_renaming_map:dict=None, log_doc_completions:bool=False ):
+        """Initializes context manager for Text object insertions.
+        
+        Parameters:
+         
+        :param collection: PgCollection
+            Collection where Text objects will be inserted.
+        :param layers: List[str]
+            Names of the new layers that are inserted into the collection.
+        :param buffer_size: int
+            Maximum buffer size (in table rows) for the insert query. 
+            If the size is met or exceeded, the insert buffer will be flushed. 
+            (Default: 10000)
+        :param query_length_limit: int
+            Soft approximate insert query length limit in unicode characters. 
+            If the limit is met or exceeded, the insert buffer will be flushed.
+            (Default: 5000000)
+        :param layer_renaming_map:dict
+            A dictionary specifying how to rename layers, mapping from old layer 
+            names (strings) to new ones (strings).
+            Default: None (no layers will be renamed);
+        :param log_doc_completions: bool
+            Whether completed insertions of documents will be explicitly logged.
+            (Default: False)
+        """
+        self.collection = collection
+        if self.collection.version < '4.0':
+            raise Exception( ("Cannot use this CollectionMultiTableInserter with collection version {!r}. "+\
+                              "PgCollection version 4.0+ is required.").format(self.collection.version) )
+        self.buffer_size = buffer_size
+        self.query_length_limit = query_length_limit
+        assert layer_renaming_map is None or isinstance(layer_renaming_map, dict)
+        self.layer_renaming_map = layer_renaming_map
+        self.log_doc_completions = log_doc_completions
+        # Note: 
+        # * if the collection was just created and has no documents, then it only has structure_layers; 
+        # * if documents have already been inserted into the collection, then it has both structure_layers 
+        #   and filled_layers;
+        existing_structure_layers = list(self.collection._structure) if self.collection._structure else []
+        existing_filled_layers = self.collection.layers or []
+        # Validate target layers & collect corresponding collection layers
+        assert isinstance(layers, list) and len(layers) > 0
+        assert all([isinstance(l, str) for l in layers])
+        missing_layers = []
+        collection_layers = []
+        for target_layer in layers:
+            layer_exists_1 = target_layer in existing_structure_layers or \
+                             target_layer in existing_filled_layers
+            layer_exists_2 = False
+            if self.layer_renaming_map is not None:
+                renamed_layer = (self.layer_renaming_map).get( target_layer, target_layer )
+                layer_exists_2 = renamed_layer in existing_structure_layers or \
+                                 renamed_layer in existing_filled_layers
+                collection_layers.append(renamed_layer)
+            else:
+                collection_layers.append(target_layer)
+            if not layer_exists_1 and not layer_exists_2:
+                missing_layers.append( target_layer )
+        if missing_layers:
+            raise Exception(f'(!) Cannot add layers: no tables have been created for layers {missing_layers!r}. '+\
+                             'Please use script d_create_collection_tables.py for creating layer tables.')
+        assert len(collection_layers) == len(layers)
+        self.layers = layers
+        self.collection_layers = collection_layers
+        # Make mapping from insertion phases to table names and columns
+        self.insertion_phase_map = OrderedDict()
+        insertable_tables = []
+        # Layer tables
+        for lid, layer_name in enumerate(self.layers):
+            layer_name  = self.collection_layers[lid] # get layer name (which could be renamed)
+            layer_table = layer_table_name(collection.name, layer_name)
+            table_identifier = \
+                layer_table_identifier(self.collection.storage, self.collection.name, layer_name)
+            insertable_tables.append( [layer_table, table_identifier, ["id", "text_id", "data"]] )
+            self.insertion_phase_map[f'_layer_{layer_name}'] = (layer_table, insertable_tables[-1][-1])
+        self.insertable_tables = insertable_tables
+        self.buffered_inserter = None
+        self.text_insert_counter = 0
+
+
+    def __enter__(self):
+        """ Initializes the insertion buffer. Assumes collection structure & tables have already been created. """
+        self.collection.storage.conn.commit()
+        self.collection.storage.conn.autocommit = False
+        assert self.insertable_tables is not None and len(self.insertable_tables) > 0
+        # Make new buffered inserter
+        self.buffered_inserter = BufferedMultiTableInsert( self.collection.storage, 
+                                                           self.insertable_tables,
+                                                           query_length_limit = self.query_length_limit,
+                                                           buffer_size = self.buffer_size,
+                                                           log_doc_completions = self.log_doc_completions)
+        cursor = self.buffered_inserter.cursor
+        assert cursor is not None
+        return self
+
+
+    def __exit__(self, type, value, traceback):
+        """ Closes the insertion buffer. """
+        if self.buffered_inserter is not None:
+            self.buffered_inserter.close()
+            logger.info('inserted layers of {} texts into the collection {!r}'.format(self.text_insert_counter, self.collection.name))
+
+    def __call__(self, text, key): 
+        self.insert(text, key=key)
+
+
+    def insert(self, text, key):
+        """Inserts new layers from the Text object with the given key into the collection.
+        """
+        assert self.buffered_inserter is not None
+        #
+        # Divide Text obj insertion into different phases
+        #
+        last_phase = list( self.insertion_phase_map.keys() )[-1]
+        for phase in self.insertion_phase_map.keys():
+            table_name    = self.insertion_phase_map[phase][0]
+            table_columns = self.insertion_phase_map[phase][1]
+            if phase.startswith('_layer_'):
+                # Insert Text's layer
+                layer_name = phase[7:]
+                cur_layer_new_name = None
+                if self.layer_renaming_map is not None:
+                    # Fetch the old name of the layer (before it was renamed)
+                    for old_name, new_name in (self.layer_renaming_map).items():
+                        if new_name == layer_name:
+                            layer_name = old_name
+                            cur_layer_new_name = new_name
+                            break
+                    # This layer was not renamed
+                    if cur_layer_new_name is None:
+                        cur_layer_new_name = layer_name
+                assert layer_name in text.layers, \
+                    f'(!) Text object is missing insertable layer {layer_name!r}. Available layers: {text.layers}'
+                layer_object = text[layer_name]
+                if self.layer_renaming_map is not None:
+                    # Rename Layer object
+                    rename_layer( layer_object, self.layer_renaming_map )
+                    assert layer_object.name == cur_layer_new_name
+                row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
+                assert len(table_columns) == len(row)
+                # If this the last phase of the insertion, then 
+                # mark this document as completed
+                doc_completed = None
+                if last_phase == phase:
+                    doc_completed = key
+                self.buffered_inserter.insert( table_name, row, doc_completed=doc_completed )
+            else:
+                raise NotImplementedError(f'(!) Unimplemented phase: {phase!r}')
+        # Mark document insertion completed
+        self.text_insert_counter += 1
+
+
+    def is_inserted(self, key, detailed=False):
+        """Checks whether layers of the Text object with the given key have been 
+           inserted into tables targeted by this CollectionLayerMultiTableInserter. 
+           Use this method to check whether layers have already been inserted 
+           during the collection update. 
+           Note that by default, the method returns `True` even if the layers have 
+           have been partially inserted, i.e. some are inserted, others are missing. 
+           Switch on the flag `detailed` to get a detailed overview of the insertion 
+           status: then the method will return a list of tuples 
+           (insertion_phase:str, status:bool). 
+        """
+        #
+        # Check insertion statuses of all different insertion phases
+        #
+        insertion_phases = []
+        insertion_statuses = []
+        with self.collection.storage.conn.cursor() as cursor:
+            for phase in self.insertion_phase_map.keys():
+                table_name = self.insertion_phase_map[phase][0]
+                table_identifier = [i[1] for i in self.insertable_tables if i[0] == table_name]
+                assert len(table_identifier) > 0
+                table_identifier = table_identifier[0]
+                query = None
+                if phase.startswith('_layer_'):
+                    query = SQL('SELECT 1 FROM {table} WHERE {table}."text_id" = {key} LIMIT 1').format(table=table_identifier, 
+                                                                                                        key=Literal(key))
+                assert query is not None
+                cursor.execute( query )
+                result = cursor.fetchone()
+                insertion_phases.append(phase)
+                insertion_statuses.append( bool(result) )
+        return any(insertion_statuses) if not detailed else [(k,s) for k,s in zip(insertion_phases, insertion_statuses)]

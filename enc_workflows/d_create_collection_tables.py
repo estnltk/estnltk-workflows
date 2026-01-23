@@ -1,5 +1,8 @@
 #
 #   Creates Postgres database tables for the given collection.
+#   If the collection already exists, then:
+#   * Use flag -r to remove the existing collection and start from the scratch.
+#   * Use flag -u to update the existing collection by adding new layers. 
 #   
 #   Requires name of a configuration INI file as an input argument. 
 #   
@@ -15,7 +18,6 @@ from datetime import datetime
 
 import warnings
 
-from estnltk import logger
 from estnltk.storage import postgres as pg
 
 from x_configparser import parse_configuration
@@ -28,15 +30,26 @@ from x_db_utils import sentence_hash_table_exists
 from x_db_utils import create_sentence_hash_table
 from x_db_utils import drop_sentence_hash_table
 from x_db_utils import retrieve_collection_hash_table_names
+from x_logging import get_logger_with_tqdm_handler
+
+logger = get_logger_with_tqdm_handler()
 
 # Overwrite existing collection
 overwrite_existing = False
+
+# Update existing collection
+update_existing = False
 
 if len(sys.argv) > 1:
     input_fname = sys.argv[1]
     for s_arg in sys.argv[1:]:
         if s_arg.lower() in ['-r', '--overwrite']:
             overwrite_existing = True
+        elif s_arg.lower() in ['-u', '--update']:
+            update_existing = True
+    if overwrite_existing and update_existing:
+        raise Exception('(!) Cannot overwrite and update the collection at the same time. '+\
+                        'Use only one of the options -r or -u.')
     if os.path.isfile(input_fname):
         # Get & validate configuration parameters
         configuration = None
@@ -46,9 +59,13 @@ if len(sys.argv) > 1:
             raise Exception('(!) Input file {!r} with unexpected extension, expected a configuration INI file.'.format(input_fname))
         if configuration is not None:
             # Get collection's parameters
-            collection_name = configuration['collection']
-            collection_description = configuration.get('collection_description', None)
             logger.setLevel( configuration['db_insertion_log_level'] )
+            collection_name = configuration.get('db_collection_name', None)
+            if collection_name is None:
+                collection_name = configuration['collection']
+            else:
+                logger.info( f'Local collection name: {configuration["collection"]!r} | Database collection name: {collection_name!r}' )
+            collection_description = configuration.get('collection_description', None)
             validate_database_access_parameters( configuration )
             #print( configuration )
             # Connect to the storage
@@ -63,15 +80,21 @@ if len(sys.argv) > 1:
                                          create_schema_if_missing=configuration.get('create_schema_if_missing', False))
             # Check for the existence of the collection
             if collection_name in storage.collections:
-                if not overwrite_existing:
+                if not overwrite_existing and not update_existing:
                     storage_exists_error_msg = \
                         f'(!) Collection {collection_name!r} already exists in the database. '+\
-                        f'Use flag -r to remove the existing collection and start from the scratch.'
+                        f'Use flag -r to remove the existing collection and start from the scratch. '+\
+                        f'Use flag -u to update the existing collection by adding new layers. '
                     logger.error( storage_exists_error_msg )
                     raise Exception(storage_exists_error_msg)
-                else:
-                    logger.info( f'Removing existing collection {collection_name!r}.' )
+                elif overwrite_existing and not update_existing:
                     collection = storage[collection_name]
+                    if not collection._is_empty:
+                        choice = input( f'(!) Collection {collection_name!r} is not empty. '+\
+                                         'Do you really want to remove it and start from the scratch? [y/N]')
+                        if choice.lower() not in ['y', 'yes']:
+                            sys.exit()
+                    logger.info( f'Removing existing collection {collection_name!r}.' )
                     if metadata_table_exists(collection):
                         drop_collection_metadata_table(collection)
                     # Retrieve hash table layer names
@@ -81,7 +104,31 @@ if len(sys.argv) > 1:
                         if sentence_hash_table_exists(collection, layer_name=layer):
                             drop_sentence_hash_table(collection, layer_name=layer)
                     storage.delete_collection(collection_name)
-            
+                elif not overwrite_existing and update_existing:
+                    # Get database updates
+                    db_updates_conf = configuration.get('db_updates', None)
+                    if db_updates_conf is None or len(db_updates_conf.keys()) == 0:
+                        raise Exception(f'(!) Configuration file {input_fname!r} does not define any database updates.')
+                    # Take the last / latest update
+                    # TODO: make it possible to pass name of the target update as a command line parameter
+                    last_update = next(reversed(db_updates_conf.keys()))
+                    target_layers = db_updates_conf[last_update].get('add_layers', None)
+                    assert target_layers is not None and len(target_layers) > 0, \
+                        f'(!) Configuration file {input_fname!r} does not define any layers to be updated.'
+                    logger.info( f'Updating existing collection {collection_name!r} with layers {target_layers}.' )
+                    collection = storage[collection_name]
+                    # Update collection's layers, add missing tables
+                    remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+                    create_collection_layer_tables(configuration, collection, 
+                                                   remove_sentences_hash_attr=remove_sentences_hash_attr, 
+                                                   sentences_layer='sentences', 
+                                                   sentences_hash_attr='sha256', 
+                                                   update=True,
+                                                   update_layers=target_layers)
+                    # Close connection
+                    storage.close()
+                    sys.exit()
+
             # Add new collection
             meta = {'src': 'str'} if configuration['add_src_as_meta'] else None
             if collection_description is None:

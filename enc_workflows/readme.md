@@ -43,9 +43,12 @@ Processing steps:
 	* `python  a_convert_vert_to_json_files.py  confs/literature_old.ini`
 	* For storing json files, the script creates a collection directory (e.g. `literature_old`, `literature_contemporary`);
 
-* `b_add_syntax_to_json_files.py` -- adds syntactic analyses to (json format) Text objects and creates morphosyntactic layers combining the (input) morphological annotations and newly created syntactic annotations. Name of the collection's configuration is required as an input argument, e.g.
-	* `python  b_add_syntax_to_json_files.py  confs/literature_old.ini`
+* `b1_add_syntax_to_json_files.py` -- adds syntactic analyses to (json format) Text objects and creates morphosyntactic layers combining the (input) morphological annotations and newly created syntactic annotations. Name of the collection's configuration is required as an input argument, e.g.
+	* `python  b1_add_syntax_to_json_files.py  confs/literature_old.ini`
 	* By default, overwrites collection's old json files with new ones;
+
+* `b2_add_clauses_timexes_names_to_json_files.py` -- **. . .**
+* `b3_add_bert_ner_to_json_files.py` -- **. . .**
 
 * `c_write_syntax_to_vert_file.py` -- reads syntactic annotations from EstNLTK's json files and writes into ENC vert files. Requires name of the collection's configuration as an input argument, e.g.
 	* `python  c_write_syntax_to_vert_file.py  confs/literature_old.ini`
@@ -53,7 +56,7 @@ Processing steps:
  
 #### Data parallelization
 
-Scripts `a_convert_vert_to_json_files.py` and `b_add_syntax_to_json_files.py` support document-index-wise data parallelization: you can launch multiple instances of script and give each instance a (non-overlapping) sub set of documents for processing.  
+Scripts `a_convert_vert_to_json_files.py` and `b1_add_syntax_to_json_files.py` support document-index-wise data parallelization: you can launch multiple instances of script and give each instance a (non-overlapping) sub set of documents for processing.  
 For this, use command line parameters `DIVISOR,REMAINDER` (both integers) to process only texts for which holds `text_id % DIVISOR == REMAINDER`. 
 
 Example: Launch two separate jobs for converting `balanced_and_reference_corpus` documents to json:
@@ -145,6 +148,13 @@ _\* Remarks about metadata_:
 
 * Source corpus. Base table of the collection (e.g. `literature_old`) will have metadata column `src` which stores normalized source corpus name (e.g. `Literature Old` or `Literature Contemporary`). The metadata table will also have column `initial_src*` which stores the precise source corpus name extracted from the vert file (e.g. `Literature Old 1864–1945` or `Literature Contemporary 2000–2023`). 
 
+#### Updating database tables
+
+If documents with basic layers ( `words`, `sentences`, `morphosyntax` ) have already been inserted into a database collection, and you want to update the collection with new layers that are in JSON files, run the script `d_create_collection_tables.py` with flag `-u` (or `--update`) to create tables for new layers, for instance: 
+
+`python  d_create_collection_tables.py  -u  confs/literature_old.ini` adds new layer tables to an existing collection `literature_old`. For a successful update, the configuration file should contain a section named `database_update` (e.g. `database_update_2026`), which should define `add_layers` variable listing names of all new layers that need to be added to the collection (these layers must be present in all JSON files). 
+
+
 ### Document insertion
 
 Use script `e_import_json_files_to_collection.py` for importing contents of the collection directory to the Postgres database. 
@@ -154,7 +164,12 @@ Example:
 
 `python  e_import_json_files_to_collection.py  confs/literature_old.ini` reads document JSON files from the collection directory `literature_old`, and stores in the collection's tables.
 
-Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors.
+**Updating collection with new layers**. If the documents already exist, and you want to add new layers from JSON files, run the script `e_import_json_files_to_collection.py` with flag `-u` (or `--update`), for instance: 
+
+`python  e_import_json_files_to_collection.py  -u  confs/literature_old.ini` adds new layers from JSON files to an existing collection `literature_old`. Prerequisite: updateable layer tables must be created beforehand, see the section "Updating database tables" above.
+
+
+Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion/update has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors.
 
 #### Data parallelization
 
@@ -184,3 +199,5 @@ Example 2: Launch three separate jobs for inserting `balanced_and_reference_corp
 	$ python  e_import_json_files_to_collection.py  confs/balanced_and_reference_corpus.ini  3,2
 
 (this inserts only texts with id-s: 2, 5, 8, 11, 14, ... )
+
+The data parallelization also works when updating existing documents (the flag `-u`). 

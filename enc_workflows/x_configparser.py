@@ -7,6 +7,7 @@ import os, os.path
 import configparser
 import logging
 import warnings
+from collections import OrderedDict
 
 def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_vert_file:bool=False ):
     '''Parses ENC processing configuration parameters from the given INI file.'''
@@ -144,6 +145,92 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                                  f'parameter "depparse_batch_size". '+\
                                  f'Expected value greater than {clean_conf["parsing_max_words_in_sentence"]}.')
             clean_conf['add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
+        if section.startswith('add_clauses_timexes_names_layers'):
+            #
+            # Load configuration for adding clauses, timexes and (default) named entities layers to the collection
+            #
+            for layer_name in ['clauses_layer', 'timexes_layer', 'ner_layer']:
+                if not config.has_option(section, layer_name):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} is missing {layer_name!r} parameter.')
+                # output layer name
+                output_layer_name = str(config[section][layer_name])
+                # validate
+                if not output_layer_name.isidentifier():
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {output_layer_name!r} for parameter {layer_name!r}. '+
+                                      'Expected a legitimate identifier for a layer name.')
+                # set output layer name
+                clean_conf[f'b2_output_{layer_name}'] = output_layer_name
+            clean_conf['b2_input_words_layer'] = config[section].get('input_words_layer', 'words')
+            clean_conf['b2_input_sentences_layer'] = config[section].get('input_sentences_layer', "sentences")
+            #
+            # output_mode
+            # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name (default);
+            # OVERWRITE -- overwrites the old json file with new content;
+            # NO_OUTPUT -- do not write output (for debugging only);
+            #
+            clean_conf['b2_output_mode'] = config[section].get('output_mode', 'NEW_FILE')
+            clean_conf['b2_output_file_infix'] = config[section].get('output_file_infix', '_clauses_timexes_names')
+            clean_conf['b2_output_mode'] = clean_conf['b2_output_mode'].upper()
+            assert clean_conf['b2_output_mode'] in ['NEW_FILE', 'OVERWRITE', 'NO_OUTPUT']
+            if clean_conf['b2_output_mode'] == 'NEW_FILE':
+                if (not isinstance(clean_conf['b2_output_file_infix'], str) or \
+                    len(clean_conf['b2_output_file_infix'].strip()) == 0):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["b2_output_file_infix"]!r} for '+\
+                                      'parameter "output_file_infix". Expected a non-empty string.')
+            clean_conf['b2_output_file_infix'] = clean_conf['b2_output_file_infix'].strip()
+            clean_conf['b2_skip_annotated'] = config[section].getboolean('skip_annotated', True)
+            clean_conf['b2_validate_layer_sizes'] = config[section].getboolean('validate_layer_sizes', False)
+            clean_conf['b2_add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
+            #
+            # Modifies words layer and adds "normalized_form" values w -> v during the preprocessing.
+            # (e.g. 'Jüripäew' -> 'Jüripäev', 'wõtavad' -> 'võtavad')
+            # This affects directly timexes and clauses detection, but indirectly also named entity recognition
+            #
+            clean_conf['b2_normalize_w_to_v'] = config[section].getboolean('normalize_w_to_v', False)
+        if section.startswith('add_bert_based_ner_layer'):
+            #
+            # Load configuration for adding Bert based named entities layer to the collection
+            #
+            for layer_name in ['ner_layer']:
+                if not config.has_option(section, layer_name):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} is missing {layer_name!r} parameter.')
+                # output layer name
+                output_layer_name = str(config[section][layer_name])
+                # validate
+                if not output_layer_name.isidentifier():
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {output_layer_name!r} for parameter {layer_name!r}. '+
+                                      'Expected a legitimate identifier for a layer name.')
+                # set output layer name
+                clean_conf[f'b3_output_{layer_name}'] = output_layer_name
+            clean_conf['b3_input_words_layer'] = config[section].get('input_words_layer', 'words')
+            clean_conf['b3_input_sentences_layer'] = config[section].get('input_sentences_layer', "sentences")
+            #
+            # output_mode
+            # NEW_FILE  -- creates a new json file by adding `output_file_infix` to the old file name (default);
+            # OVERWRITE -- overwrites the old json file with new content;
+            # NO_OUTPUT -- do not write output (for debugging only);
+            #
+            clean_conf['b3_output_mode'] = config[section].get('output_mode', 'NEW_FILE')
+            clean_conf['b3_output_file_infix'] = config[section].get('output_file_infix', '_bert_names')
+            clean_conf['b3_output_mode'] = clean_conf['b3_output_mode'].upper()
+            assert clean_conf['b3_output_mode'] in ['NEW_FILE', 'OVERWRITE', 'NO_OUTPUT']
+            if clean_conf['b3_output_mode'] == 'NEW_FILE':
+                if (not isinstance(clean_conf['b3_output_file_infix'], str) or \
+                    len(clean_conf['b3_output_file_infix'].strip()) == 0):
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["b3_output_file_infix"]!r} for '+\
+                                      'parameter "output_file_infix". Expected a non-empty string.')
+            clean_conf['b3_output_file_infix'] = clean_conf['b3_output_file_infix'].strip()
+            clean_conf['b3_skip_annotated'] = config[section].getboolean('skip_annotated', True)
+            clean_conf['b3_ner_model'] = config[section].get('ner_model', 'estbertner_v1')
+            clean_conf['b3_use_gpu'] = config[section].getboolean('use_gpu', False) 
+            clean_conf['b3_batch_size'] = config[section].getint('batch_size', 1750)
+            clean_conf['b3_stride'] = config[section].getint('stride', -1)
+            if clean_conf['b3_stride'] == -1:
+                clean_conf['b3_stride'] = None
+            clean_conf['b3_use_fast'] = config[section].getboolean('use_fast', False)
+            clean_conf['b3_aggregation_strategy'] = config[section].get('aggregation_strategy', None)
+            clean_conf['b3_validate_layer_sizes'] = config[section].getboolean('validate_layer_sizes', False)
+            clean_conf['b3_add_layer_creation_time'] = config[section].getboolean('add_layer_creation_time', False)
         if section.startswith('write_syntax_to_vert'):
             #
             # Load configuration for writing syntactic annotations to (a new) vert file
@@ -187,6 +274,16 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                                  f'with overlapping names: {intersecting}')
             # Merge db access conf into main conf
             clean_conf.update( db_conf_dict )
+            # 
+            # Optional: overwrite local collection name with db_collection_name
+            # If not provided (default), then configuration['collection'] is used as the collection name 
+            # in Postgres' database. Otherwise, uses given 'db_collection_name' as the collection name. 
+            # Overwrite it only when you know what you are doing!
+            clean_conf['db_collection_name'] = config[section].get('db_collection_name', None)
+            if clean_conf['db_collection_name'] is not None:
+                if not clean_conf['db_collection_name'].isidentifier():
+                    raise ValueError(f'Error in {conf_file}: section {section!r} invalid value {clean_conf["db_collection_name"]!r} '+\
+                                      'for parameter "db_collection_name". Expected a legitimate identifier.')
             #
             # Parse parameters required for collection table creation
             #
@@ -286,6 +383,36 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                 config[section].getint('db_insert_query_length_limit', 5000000) 
             assert clean_conf['db_insert_query_length_limit'] > 0, \
                 f"(!) db_insert_query_length_limit must be a positive integer, not {clean_conf['db_insert_query_length_limit']}"
+        if load_db_conf and section.startswith('database_update'):
+            #
+            # Load database update configuration
+            #
+            # Note: the configuration file can list multiple database update 
+            # sections, all of which should have distinctive suffixes, e.g. 
+            # "database_update_2025", "database_update_2026" etc.
+            # 
+            if 'db_updates' not in clean_conf.keys():
+                clean_conf['db_updates'] = OrderedDict()
+            if section in clean_conf['db_updates'].keys():
+                raise ValueError(f'Error in {conf_file}: duplicate database update section {section!r}. '+\
+                                  'Database update sections should have distinctive name suffixes. ')
+            # Add new database update section
+            clean_conf['db_updates'][section] = dict()
+            add_new_layers_string = config[section].get('add_layers', None)
+            if isinstance(add_new_layers_string, str):
+                #
+                # Insert the following new layers
+                #
+                new_layers = [f.strip() for f in re.split('[;,]', add_new_layers_string) if len(f.strip()) > 0]
+                if len(new_layers) == 0:
+                    raise ValueError(f'Error in {conf_file}: section {section!r} parameter "add_layers" must not be empty. '+\
+                                      'In order to update the collection by adding new layers, please list names of layers inside '+\
+                                      'the parameter "add_layers". ')
+                clean_conf['db_updates'][section]['add_layers'] = list(OrderedDict.fromkeys(new_layers))
+            if len(clean_conf['db_updates'][section].keys()) == 0:
+                raise ValueError(f'Error in {conf_file}: section {section!r} is empty. '+\
+                                  'In order to define an update of the collection, use parameter "add_layers" to '+\
+                                  'list new layers that will be added to the collection. ')
 
     if 'collection' in clean_conf.keys():
         # Return collected configuration

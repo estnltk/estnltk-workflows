@@ -4,6 +4,7 @@
 
 import logging
 from estnltk import logger as estnltk_logger
+from estnltk.helpers.logger import TqdmLoggingHandler
 
 def init_logger( log_file_name, level, block ):
     estnltk_logger.setLevel( level )
@@ -18,3 +19,11 @@ def init_logger( log_file_name, level, block ):
     estnltk_logger.addHandler(f_handler)
     return estnltk_logger
 
+
+def get_logger_with_tqdm_handler(level=logging.INFO):
+    logger = estnltk_logger
+    # Check if a TqdmLoggingHandler is already attached
+    if not any(isinstance(h, TqdmLoggingHandler) for h in logger.handlers):
+        logger.addHandler(TqdmLoggingHandler())
+        logger.setLevel(level)
+    return logger
