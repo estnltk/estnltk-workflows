@@ -150,7 +150,7 @@ _\* Remarks about metadata_:
 
 #### Updating database tables
 
-If documents with basic layers ( `words`, `sentences`, `morphosyntax` ) have already been inserted into a database collection, and you want to update the collection with new layers that are in JSON files, run the script `d_create_collection_tables.py` with flag `-u` (or `--update`) to create tables for the new layers, for instance: 
+If documents with basic layers ( `words`, `sentences`, `morphosyntax` ) have already been inserted into a database collection, and you want to update the collection with new layers that are in JSON files, run the script `d_create_collection_tables.py` with flag `-u` (or `--update`) to create tables for new layers, for instance: 
 
 `python  d_create_collection_tables.py  -u  confs/literature_old.ini` adds new layer tables to an existing collection `literature_old`. For a successful update, the configuration file should contain a section named `database_update` (e.g. `database_update_2026`), which should define `add_layers` variable listing names of all new layers that need to be added to the collection (these layers must be present in all JSON files). 
 
