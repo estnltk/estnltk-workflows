@@ -150,9 +150,9 @@ _\* Remarks about metadata_:
 
 #### Updating database tables
 
-If documents with basic layers ( `words`, `sentences`, `morphosyntax` ) have already been inserted into a database collection, and you want to update the collection with new layers that are in JSON files, run the script `d_create_collection_tables.py` with flag `-u` (or `--update`) to create tables for new layers, for instance: 
+If documents with basic layers ( `words`, `sentences`, `morphosyntax` ) have already been inserted into a database collection, and you want to update the collection with new layers from JSON files, run the script `d_create_collection_tables.py` with flag `-u` (or `--update`) to create tables for new layers, for instance: 
 
-`python  d_create_collection_tables.py  -u  confs/literature_old.ini` adds new layer tables to an existing collection `literature_old`. For a successful update, the configuration file should contain a section named `database_update` (e.g. `database_update_2026`), which should define `add_layers` variable listing names of all new layers that need to be added to the collection (these layers must be present in all JSON files). 
+`python  d_create_collection_tables.py  confs/literature_old.ini  -u` adds new layer tables to an existing collection `literature_old`. For a successful update, the configuration file should contain a section named `database_update` (e.g. `database_update_2026`), which should define `add_layers` variable listing names of new layers to be added to the collection (these layers must be present in all JSON files). 
 
 
 ### Document insertion
@@ -166,7 +166,7 @@ Example:
 
 **Updating collection with new layers**. If the documents already exist, and you want to add new layers from JSON files, run the script `e_import_json_files_to_collection.py` with flag `-u` (or `--update`), for instance: 
 
-`python  e_import_json_files_to_collection.py  -u  confs/literature_old.ini` adds new layers from JSON files to an existing collection `literature_old`. Prerequisite: updateable layer tables must be created beforehand, see the section "Updating database tables" above.
+`python  e_import_json_files_to_collection.py  confs/literature_old.ini  -u` adds new layers from JSON files to an existing collection `literature_old`. Prerequisite: updateable layer tables must be created beforehand, see the section "Updating database tables" above.
 
 
 Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion/update has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors.
