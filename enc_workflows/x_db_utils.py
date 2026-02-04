@@ -691,6 +691,7 @@ class CollectionTextMultiTableInserter():
     def __init__(self, collection, buffer_size=10000, query_length_limit=5000000, 
                        remove_sentences_hash_attr=False, sentences_layer='sentences', 
                        sentences_hash_attr='sha256', layer_renaming_map:dict=None, 
+                       enforce_id_to_match_text_id:bool=False, 
                        log_doc_completions:bool=False ):
         """Initializes context manager for Text object insertions.
         
@@ -721,6 +722,13 @@ class CollectionTextMultiTableInserter():
             A dictionary specifying how to rename layers, mapping from old layer 
             names (strings) to new ones (strings).
             Default: None (no layers will be renamed);
+        :param enforce_id_to_match_text_id: bool
+            Whether layer and metadata id-s are enforced to match text_id-s in 
+            corresponding tables. This ensures that any attempt to insert 
+            layer or metadata of the same document multiple times raises 
+            psycopg2.errors.UniqueViolation error due to violation of the 
+            PRIMARY KEY constraint. 
+            Default: False
         :param log_doc_completions: bool
             Whether completed insertions of documents will be explicitly logged.
             (Default: False)
@@ -734,6 +742,7 @@ class CollectionTextMultiTableInserter():
         assert layer_renaming_map is None or isinstance(layer_renaming_map, dict)
         self.layer_renaming_map = layer_renaming_map
         self.log_doc_completions = log_doc_completions
+        self.enforce_id_to_match_text_id = enforce_id_to_match_text_id
         # Make mapping from insertion phases to table names and columns
         self.insertion_phase_map = OrderedDict()
         insertable_tables = []
@@ -844,7 +853,11 @@ class CollectionTextMultiTableInserter():
                 self.buffered_inserter.insert( table_name, row )
             elif phase == '_metadata':
                 # Insert Text's metadata
-                row = [ SQL_DEFAULT, key ]
+                if self.enforce_id_to_match_text_id:
+                    row = [ key, key ]
+                else:
+                    # The old behaviour
+                    row = [ SQL_DEFAULT, key ]
                 new_text_meta = CollectionTextMultiTableInserter._insertable_metadata(text, table_columns)
                 row.extend(new_text_meta)
                 assert len(table_columns) == len(row)
@@ -883,7 +896,11 @@ class CollectionTextMultiTableInserter():
                     # Rename Layer object
                     rename_layer( layer_object, self.layer_renaming_map )
                     assert layer_object.name == cur_layer_new_name
-                row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
+                if self.enforce_id_to_match_text_id:
+                    row = [ key, key, layer_to_json( layer_object ) ]
+                else:
+                    # The old behaviour
+                    row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
                 assert len(table_columns) == len(row)
                 # If this the last phase of the insertion, then 
                 # mark this document as completed
@@ -1000,7 +1017,8 @@ class CollectionLayerMultiTableInserter():
     '''
 
     def __init__(self, collection, layers, buffer_size=10000, query_length_limit=5000000, 
-                       layer_renaming_map:dict=None, log_doc_completions:bool=False ):
+                       layer_renaming_map:dict=None, enforce_id_to_match_text_id:bool=False, 
+                       log_doc_completions:bool=False ):
         """Initializes context manager for Text object insertions.
         
         Parameters:
@@ -1021,6 +1039,12 @@ class CollectionLayerMultiTableInserter():
             A dictionary specifying how to rename layers, mapping from old layer 
             names (strings) to new ones (strings).
             Default: None (no layers will be renamed);
+        :param enforce_id_to_match_text_id: bool
+            Whether layer id-s are enforced to match text_id-s. This ensures 
+            that any attempt to insert layer of the same document multiple 
+            times raises psycopg2.errors.UniqueViolation error due to 
+            violation of the PRIMARY KEY constraint. 
+            Default: False
         :param log_doc_completions: bool
             Whether completed insertions of documents will be explicitly logged.
             (Default: False)
@@ -1033,6 +1057,7 @@ class CollectionLayerMultiTableInserter():
         self.query_length_limit = query_length_limit
         assert layer_renaming_map is None or isinstance(layer_renaming_map, dict)
         self.layer_renaming_map = layer_renaming_map
+        self.enforce_id_to_match_text_id = enforce_id_to_match_text_id
         self.log_doc_completions = log_doc_completions
         # Note: 
         # * if the collection was just created and has no documents, then it only has structure_layers; 
@@ -1138,7 +1163,10 @@ class CollectionLayerMultiTableInserter():
                     # Rename Layer object
                     rename_layer( layer_object, self.layer_renaming_map )
                     assert layer_object.name == cur_layer_new_name
-                row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
+                if self.enforce_id_to_match_text_id:
+                    row = [ key, key, layer_to_json( layer_object ) ]
+                else:
+                    row = [ SQL_DEFAULT, key, layer_to_json( layer_object ) ]
                 assert len(table_columns) == len(row)
                 # If this the last phase of the insertion, then 
                 # mark this document as completed

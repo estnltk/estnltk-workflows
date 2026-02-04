@@ -383,6 +383,13 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
                 config[section].getint('db_insert_query_length_limit', 5000000) 
             assert clean_conf['db_insert_query_length_limit'] > 0, \
                 f"(!) db_insert_query_length_limit must be a positive integer, not {clean_conf['db_insert_query_length_limit']}"
+            #
+            # Whether layer id-s (and metadata id-s) are enforced to match text_id-s in 
+            # corresponding database tables. 
+            # This ensures that any attempt to insert layer (or metadata) of the same document 
+            # multiple times raises psycopg2.errors.UniqueViolation error due to violation of 
+            # the PRIMARY KEY constraint. 
+            clean_conf['db_enforce_id_to_match_text_id'] = config[section].getboolean('enforce_id_to_match_text_id', True) 
         if load_db_conf and section.startswith('database_update'):
             #
             # Load database update configuration
