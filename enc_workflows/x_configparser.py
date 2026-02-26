@@ -390,6 +390,26 @@ def parse_configuration( conf_file:str, load_db_conf:bool=False, ignore_missing_
             # multiple times raises psycopg2.errors.UniqueViolation error due to violation of 
             # the PRIMARY KEY constraint. 
             clean_conf['db_enforce_id_to_match_text_id'] = config[section].getboolean('enforce_id_to_match_text_id', True) 
+            # 
+            #  List of sparse layers 
+            #
+            sparse_layers_string = config[section].get('sparse_layers', None)
+            if isinstance(sparse_layers_string, str):
+                #
+                # Declare the following layers sparse
+                #
+                raw_sparse_layers = [f.strip() for f in re.split('[;,]', sparse_layers_string) if len(f.strip()) > 0]
+                #
+                # Sanity check: sparse layers should not be among old layers in the layer_renaming_map
+                #
+                if clean_conf['layer_renaming_map'] is not None:
+                    for old_name, new_name in clean_conf['layer_renaming_map'].items():
+                        if old_name in raw_sparse_layers:
+                            raise ValueError( f'Error in {conf_file}: section {section!r}: '+\
+                                              f'sparse layer {old_name!r} will be renamed according to '+\
+                                              f"layer renaming map {clean_conf['layer_renaming_map']!r}. "+\
+                                              "Please provide new layer name as the sparse layer name." )
+                clean_conf['db_sparse_layers'] = list(OrderedDict.fromkeys(raw_sparse_layers))
         if load_db_conf and section.startswith('database_update'):
             #
             # Load database update configuration

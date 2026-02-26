@@ -119,10 +119,12 @@ if len(sys.argv) > 1:
                     collection = storage[collection_name]
                     # Update collection's layers, add missing tables
                     remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+                    sparse_layers = configuration.get('db_sparse_layers', None)
                     create_collection_layer_tables(configuration, collection, 
                                                    remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                                    sentences_layer='sentences', 
                                                    sentences_hash_attr='sha256', 
+                                                   sparse_layers=sparse_layers, 
                                                    update=True,
                                                    update_layers=target_layers)
                     # Close connection
@@ -141,10 +143,12 @@ if len(sys.argv) > 1:
             # Create collection layer tables
             collection = storage[collection_name]
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
+            sparse_layers = configuration.get('db_sparse_layers', None)
             create_collection_layer_tables(configuration, collection, 
                                            remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                            sentences_layer='sentences', 
-                                           sentences_hash_attr='sha256' )
+                                           sentences_hash_attr='sha256',
+                                           sparse_layers=sparse_layers )
             
             # Create collection's sentences hash table
             create_sentence_hash_table(configuration, collection)

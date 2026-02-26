@@ -121,6 +121,7 @@ if len(sys.argv) > 1:
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
             log_doc_completions = configuration.get('db_log_doc_completion', False)
             enforce_id_to_match_text_id = configuration.get('db_enforce_id_to_match_text_id', True)
+            sparse_layers = configuration.get('db_sparse_layers', None)
             layer_renaming_map = configuration['layer_renaming_map']
             db_insert_buffer_size = configuration['db_insert_buffer_size']
             db_insert_query_length_limit = configuration['db_insert_query_length_limit']
@@ -172,7 +173,8 @@ if len(sys.argv) > 1:
                                                                       remove_sentences_hash_attr=remove_sentences_hash_attr, 
                                                                       sentences_layer=sentences_layer, 
                                                                       sentences_hash_attr='sha256', 
-                                                                      layer_renaming_map=layer_renaming_map,
+                                                                      layer_renaming_map=layer_renaming_map, 
+                                                                      sparse_layers=sparse_layers, 
                                                                       enforce_id_to_match_text_id=enforce_id_to_match_text_id, 
                                                                       log_doc_completions=log_doc_completions )
                 else:
@@ -183,6 +185,7 @@ if len(sys.argv) > 1:
                                                                        buffer_size=db_insert_buffer_size, 
                                                                        query_length_limit=db_insert_query_length_limit, 
                                                                        layer_renaming_map=layer_renaming_map,
+                                                                       sparse_layers=sparse_layers, 
                                                                        enforce_id_to_match_text_id=enforce_id_to_match_text_id, 
                                                                        log_doc_completions=log_doc_completions )
                 with text_inserter:

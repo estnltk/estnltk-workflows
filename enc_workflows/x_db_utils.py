@@ -140,7 +140,7 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                 if old_name in sparse_layers:
                     raise ValueError(f'(!) Sparse layer {old_name!r} will be renamed according to '+\
                                      f"layer renaming map {configuration['layer_renaming_map']!r}. "+\
-                                     "Please provide name of the new layer as a sparse layer name.")
+                                     "Please provide new layer name as the sparse layer name.")
         # Apply layer renaming
         for template in layer_templates:
             rename_layer(template, renaming_map=configuration['layer_renaming_map'])
@@ -217,7 +217,8 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                     # no exception, transaction in progress
                     conn.commit()
 
-        logger.info('{} layer {!r} created from template'.format(layer_type, template.name))
+        sparsity_status = 'sparse ' if template.name in sparse_layers else ''
+        logger.info('{}{} layer {!r} created from template'.format(sparsity_status, layer_type, template.name))
     if tables_created > 0:
         logger.info('created {} new layer tables to the collection {!r}'.format(tables_created, collection.name))
     elif update:
@@ -1215,7 +1216,7 @@ class CollectionLayerMultiTableInserter():
                     # Rename Layer object
                     rename_layer( layer_object, self.layer_renaming_map )
                     assert layer_object.name == cur_layer_new_name
-               if layer_object.name in self.sparse_layers and len(layer_object) == 0:
+                if layer_object.name in self.sparse_layers and len(layer_object) == 0:
                     #
                     # Sparse layer table: skip insertion of an empty layer
                     #
