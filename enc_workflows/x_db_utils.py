@@ -48,7 +48,7 @@ logger = get_logger_with_tqdm_handler()
 
 def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgCollection',  layer_type: str = 'detached',
                                     remove_sentences_hash_attr=False, sentences_layer='sentences', sentences_hash_attr='sha256',
-                                    update:bool=False, update_layers:'List[str]'=None ):
+                                    sparse_layers: list=None, update:bool=False, update_layers:'List[str]'=None ):
     '''
     Creates layer tables to the `collection` based on layer templates loaded from collection's JSON files. 
     The `configuration` is used to find collection's subdirectories containing JSON files. 
@@ -85,7 +85,7 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
             raise Exception("Cannot update collection: no existing layers!")
         if update_layers is None or len(update_layers) == 0:
             raise Exception("Cannot update collection: no update_layers specified!")
-    is_sparse = False
+    sparse_layers = set(sparse_layers) if sparse_layers is not None else set()
     meta = None
     # Load layer templates
     layer_templates = load_collection_layer_templates(configuration)
@@ -134,6 +134,13 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
         layer_templates = new_layer_templates
 
     if configuration['layer_renaming_map'] is not None:
+        # Sanity check: sparse layer names should be among new layer names, not among old ones
+        if sparse_layers:
+            for old_name, new_name in configuration['layer_renaming_map'].items():
+                if old_name in sparse_layers:
+                    raise ValueError(f'(!) Sparse layer {old_name!r} will be renamed according to '+\
+                                     f"layer renaming map {configuration['layer_renaming_map']!r}. "+\
+                                     "Please provide name of the new layer as a sparse layer name.")
         # Apply layer renaming
         for template in layer_templates:
             rename_layer(template, renaming_map=configuration['layer_renaming_map'])
@@ -171,7 +178,8 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                                                                            omit_commit=True, omit_rollback=True):
                     raise Exception("The table for the {} layer {!r} already exists.".format(layer_type, template.name))
                 
-                collection._structure.insert(layer=template, layer_type=layer_type, meta=meta, is_sparse=is_sparse)
+                collection._structure.insert(layer=template, layer_type=layer_type, meta=meta, 
+                                             is_sparse=template.name in sparse_layers)
 
                 # B) create layer table and required indexes
                 # The following logic is from former self._create_layer_table method
@@ -691,7 +699,7 @@ class CollectionTextMultiTableInserter():
     def __init__(self, collection, buffer_size=10000, query_length_limit=5000000, 
                        remove_sentences_hash_attr=False, sentences_layer='sentences', 
                        sentences_hash_attr='sha256', layer_renaming_map:dict=None, 
-                       enforce_id_to_match_text_id:bool=False, 
+                       sparse_layers: list=None, enforce_id_to_match_text_id:bool=False, 
                        log_doc_completions:bool=False ):
         """Initializes context manager for Text object insertions.
         
@@ -722,6 +730,11 @@ class CollectionTextMultiTableInserter():
             A dictionary specifying how to rename layers, mapping from old layer 
             names (strings) to new ones (strings).
             Default: None (no layers will be renamed);
+        :param sparse_layers: list
+            List of layers which should be treated as sparse layers. This means 
+            that only their non-empty instances are inserted into the layer table, 
+            and empty instances are skipped.
+            Default: None
         :param enforce_id_to_match_text_id: bool
             Whether layer and metadata id-s are enforced to match text_id-s in 
             corresponding tables. This ensures that any attempt to insert 
@@ -798,6 +811,14 @@ class CollectionTextMultiTableInserter():
         self.insertable_tables = insertable_tables
         self.buffered_inserter = None
         self.text_insert_counter = 0
+        # Validate sparse layers
+        assert sparse_layers is None or isinstance(sparse_layers, list)
+        if sparse_layers is not None:
+            for layer in sparse_layers:
+                if layer not in layers:
+                    raise Exception(f"(!) sparse_layer {layer!r} not in collection's layers list {layers!r}.")
+        self.sparse_layers = set(sparse_layers) if sparse_layers is not None else set()
+        self.sparse_insert_counter = 0
         # TODO: count complete vs incomplete insertions
 
 
@@ -821,6 +842,8 @@ class CollectionTextMultiTableInserter():
         if self.buffered_inserter is not None:
             self.buffered_inserter.close()
             logger.info('inserted {} texts into the collection {!r}'.format(self.text_insert_counter, self.collection.name))
+            if self.sparse_insert_counter > 0:
+                logger.info('skipped insertion of {} empty layers'.format(self.sparse_insert_counter))
 
     def __call__(self, text, key): 
         self.insert(text, key=key)
@@ -896,6 +919,20 @@ class CollectionTextMultiTableInserter():
                     # Rename Layer object
                     rename_layer( layer_object, self.layer_renaming_map )
                     assert layer_object.name == cur_layer_new_name
+                if layer_object.name in self.sparse_layers and len(layer_object) == 0:
+                    #
+                    # Sparse layer table: skip insertion of an empty layer
+                    #
+                    # If this the last phase of the insertion, then 
+                    # mark this document as completed
+                    doc_completed = None
+                    if last_phase == phase:
+                        # Mark document insertion completed
+                        doc_completed = key
+                        self.buffered_inserter.completion_markers[table_name].append(doc_completed)
+                    self.sparse_insert_counter += 1
+                    # Skip insertion
+                    continue
                 if self.enforce_id_to_match_text_id:
                     row = [ key, key, layer_to_json( layer_object ) ]
                 else:
@@ -1017,8 +1054,8 @@ class CollectionLayerMultiTableInserter():
     '''
 
     def __init__(self, collection, layers, buffer_size=10000, query_length_limit=5000000, 
-                       layer_renaming_map:dict=None, enforce_id_to_match_text_id:bool=False, 
-                       log_doc_completions:bool=False ):
+                       layer_renaming_map:dict=None, sparse_layers: list=None, 
+                       enforce_id_to_match_text_id:bool=False, log_doc_completions:bool=False ):
         """Initializes context manager for Text object insertions.
         
         Parameters:
@@ -1039,6 +1076,11 @@ class CollectionLayerMultiTableInserter():
             A dictionary specifying how to rename layers, mapping from old layer 
             names (strings) to new ones (strings).
             Default: None (no layers will be renamed);
+        :param sparse_layers: list
+            List of layers which should be treated as sparse layers. This means 
+            that only their non-empty instances are inserted into the layer table, 
+            and empty instances are skipped.
+            Default: None
         :param enforce_id_to_match_text_id: bool
             Whether layer id-s are enforced to match text_id-s. This ensures 
             that any attempt to insert layer of the same document multiple 
@@ -1102,7 +1144,15 @@ class CollectionLayerMultiTableInserter():
             self.insertion_phase_map[f'_layer_{layer_name}'] = (layer_table, insertable_tables[-1][-1])
         self.insertable_tables = insertable_tables
         self.buffered_inserter = None
+        # Validate sparse layers
+        assert sparse_layers is None or isinstance(sparse_layers, list)
+        if sparse_layers is not None:
+            for layer in sparse_layers:
+                if layer not in collection_layers:
+                    raise Exception(f"(!) sparse_layer {layer!r} not in collection's layers list {collection_layers!r}.")
+        self.sparse_layers = set(sparse_layers) if sparse_layers is not None else set()
         self.text_insert_counter = 0
+        self.sparse_insert_counter = 0
 
 
     def __enter__(self):
@@ -1126,6 +1176,8 @@ class CollectionLayerMultiTableInserter():
         if self.buffered_inserter is not None:
             self.buffered_inserter.close()
             logger.info('inserted layers of {} texts into the collection {!r}'.format(self.text_insert_counter, self.collection.name))
+            if self.sparse_insert_counter > 0:
+                logger.info('skipped insertion of {} empty layers'.format(self.sparse_insert_counter))
 
     def __call__(self, text, key): 
         self.insert(text, key=key)
@@ -1163,6 +1215,20 @@ class CollectionLayerMultiTableInserter():
                     # Rename Layer object
                     rename_layer( layer_object, self.layer_renaming_map )
                     assert layer_object.name == cur_layer_new_name
+               if layer_object.name in self.sparse_layers and len(layer_object) == 0:
+                    #
+                    # Sparse layer table: skip insertion of an empty layer
+                    #
+                    # If this the last phase of the insertion, then 
+                    # mark this document as completed
+                    doc_completed = None
+                    if last_phase == phase:
+                        # Mark document insertion completed
+                        doc_completed = key
+                        self.buffered_inserter.completion_markers[table_name].append(doc_completed)
+                    self.sparse_insert_counter += 1
+                    # Skip insertion
+                    continue
                 if self.enforce_id_to_match_text_id:
                     row = [ key, key, layer_to_json( layer_object ) ]
                 else:
