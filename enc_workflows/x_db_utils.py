@@ -818,6 +818,9 @@ class CollectionTextMultiTableInserter():
             for layer in sparse_layers:
                 if layer not in layers:
                     raise Exception(f"(!) sparse_layer {layer!r} not in collection's layers list {layers!r}.")
+                # Validate existing structure
+                if not (self.collection).is_sparse(layer):
+                    raise Exception(f"(!) layer {layer!r} not declared as sparse in the collection {(self.collection).name!r}.")
         self.sparse_layers = set(sparse_layers) if sparse_layers is not None else set()
         self.sparse_insert_counter = 0
         # TODO: count complete vs incomplete insertions
@@ -1151,6 +1154,9 @@ class CollectionLayerMultiTableInserter():
             for layer in sparse_layers:
                 if layer not in collection_layers:
                     raise Exception(f"(!) sparse_layer {layer!r} not in collection's layers list {collection_layers!r}.")
+                # Validate existing structure
+                if not (self.collection).is_sparse(layer):
+                    raise Exception(f"(!) layer {layer!r} not declared as sparse in the collection {(self.collection).name!r}.")
         self.sparse_layers = set(sparse_layers) if sparse_layers is not None else set()
         self.text_insert_counter = 0
         self.sparse_insert_counter = 0
