@@ -41,6 +41,7 @@ from x_utils import find_processing_speed
 
 from x_configparser import parse_configuration
 from x_configparser import validate_database_access_parameters
+from x_configparser import validate_database_naming_length_limits
 
 from x_db_utils import CollectionTextMultiTableInserter
 from x_db_utils import CollectionLayerMultiTableInserter
@@ -118,6 +119,7 @@ if len(sys.argv) > 1:
             else:
                 logger.info( f'Local collection name: {configuration["collection"]!r} | Database collection name: {collection_name!r}' )
             validate_database_access_parameters( configuration )
+            validate_database_naming_length_limits( configuration )
             remove_sentences_hash_attr = configuration['remove_sentences_hash_attr']
             log_doc_completions = configuration.get('db_log_doc_completion', False)
             enforce_id_to_match_text_id = configuration.get('db_enforce_id_to_match_text_id', True)

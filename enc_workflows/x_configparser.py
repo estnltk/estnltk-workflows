@@ -550,3 +550,97 @@ def validate_database_access_parameters( configuration:dict ):
                         '1) pgpass_file (that contains host:port:dbname:user:password ), '+\
                         'schema and role; or 2) explicit values for host, port, database, '+\
                         'username, password, schema and role;')
+
+
+def validate_database_naming_length_limits( configuration:dict ):
+    '''
+    Validates that database naming parameters in the given configuration satisfy 
+    PostgreSQL's length limits for identifiers. 
+    Rationale: all PostgreSQL identifiers -- including index names, table names, 
+    column names, constraint names -- must be no longer than 63 characters. Any 
+    longer names will be silently truncated and this can lead to unexpected 
+    duplicate-name errors or confusing mismatches between expected and actual 
+    names. 
+    This validator generates possible table and index names according to the 
+    given configuration and EstNLTK's table naming conventions, and warns about 
+    names exceeding the limits. 
+    Note that only layer names declared under 'rename_layers' and 'add_layers' 
+    in the configuration will be checked. If JSON files contain additional layers 
+    not declared under these sections, names of those layers won't be checked. 
+    '''
+    collection_name = configuration.get('db_collection_name', None)
+    if collection_name is None:
+        collection_name = configuration['collection']
+    if len(collection_name) > 63:
+        warnings.warn(f'(!) Collection name {collection_name!r} exceeds 63 chars and '+\
+                      f'will be truncated to {collection_name[:62]!r}.. Please use a shorter collection name! ')
+    table_naming_problems = 0
+    index_naming_problems = 0
+    # Check collection's tables and indexes
+    for table_name in [f'{collection_name}__structure', 
+                       f'{collection_name}__metadata', 
+                       f'{collection_name}__structure_pkey', 
+                       f'{collection_name}__metadata_pkey', 
+                       f'idx_{collection_name}_layer_data', 
+                       f'idx_{collection_name}_relation_layer_data', 
+                       f'idx_{collection_name}__metadata__text_id', 
+                       f'idx_{collection_name}__metadata__pkey', ]:
+        if len(table_name) > 63:
+            name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+            warnings.warn(f'(!) Collection {name_type} name {table_name!r} exceeds 63 chars and '+\
+                          f'will be truncated to {table_name[:62]!r}. Please use a shorter collection name! ')
+            if name_type == 'table':
+                table_naming_problems += 1
+            else:
+                index_naming_problems += 1
+    # Check collection layer tables
+    checked_layers = set()
+    if configuration['layer_renaming_map'] is not None:
+        for old_name, new_name in configuration['layer_renaming_map'].items():
+            # Check new name layer inside the layer renaming map
+            layer_name = new_name
+            if layer_name in checked_layers:
+                continue
+            for table_name in [f'{collection_name}__{layer_name}__layer', 
+                               f'{collection_name}__{layer_name}__hash', 
+                               f'{collection_name}__{layer_name}__ngrams', 
+                               f'{collection_name}__{layer_name}__layer_pkey', 
+                               f'idx_{collection_name}__{layer_name}__layer__text_id', 
+                               f'idx_{collection_name}__{layer_name}__hash__text_id', 
+                               f'idx_{collection_name}__{layer_name}__layer_spans']:
+                # TODO: check for relation layers ending with '__layer_relations'
+                if len(table_name) > 63:
+                    name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+                    warnings.warn(f'(!) Collection layer {name_type} name {table_name!r} exceeds 63 chars and '+\
+                                  f'will be truncated to {table_name[:62]!r}. Please use shorter collection or layer name! ')
+                    if name_type == 'table':
+                        table_naming_problems += 1
+                    else:
+                        index_naming_problems += 1
+            checked_layers.add( layer_name )
+    if 'db_updates' in configuration.keys():
+        for update in configuration['db_updates']:
+            if 'add_layers' in configuration['db_updates'][update].keys():
+                for layer_name in configuration['db_updates'][update]['add_layers']:
+                    layer_name = layer_name.strip()
+                    if layer_name in checked_layers:
+                        continue
+                    for table_name in [f'{collection_name}__{layer_name}__layer', 
+                                       f'{collection_name}__{layer_name}__hash', 
+                                       f'{collection_name}__{layer_name}__ngrams', 
+                                       f'{collection_name}__{layer_name}__layer_pkey', 
+                                       f'idx_{collection_name}__{layer_name}__layer__text_id', 
+                                       f'idx_{collection_name}__{layer_name}__hash__text_id', 
+                                       f'idx_{collection_name}__{layer_name}__layer_spans']:
+                        # TODO: check for relation layers ending with '__layer_relations'
+                        if len(table_name) > 63:
+                            name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+                            warnings.warn(f'(!) Collection layer {name_type} name {table_name!r} exceeds 63 chars and '+\
+                                          f'will be truncated to {table_name[:62]!r}. Please use shorter collection or layer name! ')
+                            if name_type == 'table':
+                                table_naming_problems += 1
+                            else:
+                                index_naming_problems += 1
+                    checked_layers.add( layer_name )
+    if table_naming_problems > 0 or index_naming_problems > 0:
+        print(f'(!) Encountered {table_naming_problems!r} table naming problems and {index_naming_problems!r} index naming problems.')

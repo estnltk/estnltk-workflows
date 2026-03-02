@@ -22,6 +22,7 @@ from estnltk.storage import postgres as pg
 
 from x_configparser import parse_configuration
 from x_configparser import validate_database_access_parameters
+from x_configparser import validate_database_naming_length_limits
 from x_db_utils import create_collection_layer_tables
 from x_db_utils import create_collection_metadata_table
 from x_db_utils import metadata_table_exists
@@ -67,6 +68,7 @@ if len(sys.argv) > 1:
                 logger.info( f'Local collection name: {configuration["collection"]!r} | Database collection name: {collection_name!r}' )
             collection_description = configuration.get('collection_description', None)
             validate_database_access_parameters( configuration )
+            validate_database_naming_length_limits( configuration )
             #print( configuration )
             # Connect to the storage
             storage = pg.PostgresStorage(host=configuration.get('db_host', None),
