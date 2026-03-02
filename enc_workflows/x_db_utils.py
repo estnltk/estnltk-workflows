@@ -331,6 +331,11 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
             q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
             cur.execute(q)
             logger.debug(cur.query.decode())
+            # Add text_id index to metadata table
+            cur.execute(SQL("CREATE INDEX {index} ON {metadata_table} (text_id);").format(
+                            index = Identifier('idx_%s__text_id' % metadata_table),
+                            metadata_table = table_identifier))
+            logger.debug(cur.query.decode())
         except Exception as table_creation_error:
             conn.rollback()
             raise PgCollectionException("can't create metadata table {!r}".format(metadata_table)) from table_creation_error
@@ -461,6 +466,11 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
             comment = Literal('created by {} on {}'.format(collection.storage.user, time.asctime()))
             q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
             cur.execute(q)
+            logger.debug(cur.query.decode())
+            # Add text_id index to sentence hash table
+            cur.execute(SQL("CREATE INDEX {index} ON {sentence_hash_table} (text_id);").format(
+                            index = Identifier('idx_%s__text_id' % sentence_hash_table),
+                            sentence_hash_table = table_identifier))
             logger.debug(cur.query.decode())
         except Exception as table_creation_error:
             conn.rollback()
