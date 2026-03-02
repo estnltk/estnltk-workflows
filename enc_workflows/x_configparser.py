@@ -576,6 +576,7 @@ def validate_database_naming_length_limits( configuration:dict ):
                       f'will be truncated to {collection_name[:62]!r}.. Please use a shorter collection name! ')
     table_naming_problems = 0
     index_naming_problems = 0
+    all_truncated_names = dict()
     # Check collection's tables and indexes
     for table_name in [f'{collection_name}__structure', 
                        f'{collection_name}__metadata', 
@@ -587,8 +588,11 @@ def validate_database_naming_length_limits( configuration:dict ):
                        f'idx_{collection_name}__metadata__pkey', ]:
         if len(table_name) > 63:
             name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+            truncated_name = table_name[:63]
             warnings.warn(f'(!) Collection {name_type} name {table_name!r} exceeds 63 chars and '+\
-                          f'will be truncated to {table_name[:62]!r}. Please use a shorter collection name! ')
+                          f'will be truncated to {truncated_name!r}. Please use a shorter collection name! ')
+            all_truncated_names.setdefault(truncated_name, 0)
+            all_truncated_names[truncated_name] += 1
             if name_type == 'table':
                 table_naming_problems += 1
             else:
@@ -611,8 +615,11 @@ def validate_database_naming_length_limits( configuration:dict ):
                 # TODO: check for relation layers ending with '__layer_relations'
                 if len(table_name) > 63:
                     name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+                    truncated_name = table_name[:63]
                     warnings.warn(f'(!) Collection layer {name_type} name {table_name!r} exceeds 63 chars and '+\
-                                  f'will be truncated to {table_name[:62]!r}. Please use shorter collection or layer name! ')
+                                  f'will be truncated to {truncated_name!r}. Please use shorter collection or layer name! ')
+                    all_truncated_names.setdefault(truncated_name, 0)
+                    all_truncated_names[truncated_name] += 1
                     if name_type == 'table':
                         table_naming_problems += 1
                     else:
@@ -635,12 +642,22 @@ def validate_database_naming_length_limits( configuration:dict ):
                         # TODO: check for relation layers ending with '__layer_relations'
                         if len(table_name) > 63:
                             name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+                            truncated_name = table_name[:63]
                             warnings.warn(f'(!) Collection layer {name_type} name {table_name!r} exceeds 63 chars and '+\
-                                          f'will be truncated to {table_name[:62]!r}. Please use shorter collection or layer name! ')
+                                          f'will be truncated to {truncated_name!r}. Please use shorter collection or layer name! ')
+                            all_truncated_names.setdefault(truncated_name, 0)
+                            all_truncated_names[truncated_name] += 1
                             if name_type == 'table':
                                 table_naming_problems += 1
                             else:
                                 index_naming_problems += 1
                     checked_layers.add( layer_name )
     if table_naming_problems > 0 or index_naming_problems > 0:
-        print(f'(!) Encountered {table_naming_problems!r} table naming problems and {index_naming_problems!r} index naming problems.')
+        severe_conflicts = 0
+        for truncated_name, occurrences in all_truncated_names.items():
+            if occurrences > 1:
+                warnings.warn(f'(!) Severe problem: truncated name {truncated_name!r} will be used for {occurrences} tables/indexes, '+\
+                               'making them indistinguishable.')
+                severe_conflicts += occurrences
+        severe_conflicts_str = '' if severe_conflicts < 1 else f', including {severe_conflicts} severe naming conflicts'
+        print(f'(!) Encountered {table_naming_problems!r} table naming problems and {index_naming_problems!r} index naming problems{severe_conflicts_str}.')
