@@ -169,7 +169,21 @@ Example:
 `python  e_import_json_files_to_collection.py  confs/literature_old.ini  -u` adds new layers from JSON files to an existing collection `literature_old`. Prerequisite: updateable layer tables must be created beforehand, see the section "Updating database tables" above.
 
 
-Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion/update has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors.
+Note: its advisable to use the collection via [EstNLTK's database interface](https://github.com/estnltk/estnltk/blob/main/tutorials/storage/storing_text_objects_in_postgres.ipynb) **only after the document insertion/update has been completed**. During the insertion, the collection may be in an inconsistent state: some of the documents/annotations might be incomplete, and queries might give errors. 
+Also, it is recommended to create indexes to data tables before querying, see the section "Index creation" below for details.
+
+### Index creation
+
+After all documents have been inserted into the collection (and the collection has been updated with new layers), it is recommended to create indexes over tables to enable efficient querying over the collection. 
+This can be done with script `f_create_collection_indexes.py`. 
+Pass name of the collection's configuration as an argument of the script. 
+
+Example:
+
+`python  f_create_collection_indexes.py  confs/literature_old.ini` creates indexes for `literature_old`.
+
+_Erasing mode:_ pass flag `-r` to the script to remove the existing indexes and start indexing from the scratch.
+
 
 #### Data parallelization
 

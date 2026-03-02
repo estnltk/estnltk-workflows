@@ -31,7 +31,6 @@ from estnltk.storage.postgres import layer_table_name
 
 from estnltk.storage.postgres.context_managers.buffered_table_insert import BufferedTableInsert
 
-
 from x_utils import MetaFieldsCollector
 from x_utils import load_collection_layer_templates
 from x_utils import normalize_src
@@ -211,7 +210,7 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
 
             except Exception as layer_adding_error:
                 conn.rollback()
-                raise PgCollectionException("can't add layer {!r}".format(template.name)) from layer_adding_error
+                raise pg.PgCollectionException("can't add layer {!r}".format(template.name)) from layer_adding_error
             finally:
                 if conn.status == STATUS_BEGIN:
                     # no exception, transaction in progress
@@ -338,7 +337,7 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
             logger.debug(cur.query.decode())
         except Exception as table_creation_error:
             conn.rollback()
-            raise PgCollectionException("can't create metadata table {!r}".format(metadata_table)) from table_creation_error
+            raise pg.PgCollectionException("can't create metadata table {!r}".format(metadata_table)) from table_creation_error
         finally:
             if conn.status == STATUS_BEGIN:
                 # no exception, transaction in progress
@@ -474,7 +473,7 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
             logger.debug(cur.query.decode())
         except Exception as table_creation_error:
             conn.rollback()
-            raise PgCollectionException("can't create sentence hash table {!r}".format(sentence_hash_table)) from table_creation_error
+            raise pg.PgCollectionException("can't create sentence hash table {!r}".format(sentence_hash_table)) from table_creation_error
         finally:
             if conn.status == STATUS_BEGIN:
                 # no exception, transaction in progress
@@ -486,6 +485,86 @@ def drop_sentence_hash_table( collection: 'pg.PgCollection', layer_name:str='sen
                               cascade: bool = False):
     table_name = sentence_hash_table_name(collection.name, layer_name=layer_name)
     pg.drop_table(collection.storage, table_name, cascade=cascade)
+
+
+# ===================================================================
+#    Maintaining indexes of the collection 
+# ===================================================================
+
+def get_collection_indexes( collection: 'pg.PgCollection' ):
+    '''Retrieves all indexes of the given collection from the database. 
+       Returns a list of tuples `(tablename, indexname, indexdef)`, 
+       with the information retrieved from `pg_indexes` table. 
+    '''
+    # Retrieve all indexes of the schema of the current collection
+    query = SQL("SELECT schemaname, tablename, indexname, tablespace, indexdef "
+                "FROM pg_indexes WHERE schemaname={};").format(Literal(collection.storage.schema))
+    with collection.storage.conn.cursor() as cur:
+        cur.execute( query )
+        all_indexes = cur.fetchall()
+    # Filter the results: get indexes of the current collection
+    collection_indexes = []
+    for (schemaname, tablename, indexname, tablespace, indexdef) in all_indexes:
+        tablename_parts = tablename.split('__')
+        if len(tablename_parts) == 1:
+            if tablename_parts[0] == collection.name:
+                collection_indexes.append( (tablename, indexname, indexdef) )
+        elif len(tablename_parts) > 1:
+            if tablename_parts[0] == collection.name:
+                collection_indexes.append( (tablename, indexname, indexdef) )
+    return collection_indexes
+
+
+def drop_layer_index( collection: 'pg.PgCollection', layer_name:str ):
+    '''Removes layer gin index from the database.'''
+    if not collection.exists():
+        raise pg.PgCollectionException('collection {!r} does not exist'.format(collection.name))
+    if layer_name not in collection.structure:
+        collection.refresh()
+    if layer_name not in collection.structure:
+        # Note: at this point, the structure should already exist
+        # ( created by add_layer(...) function )
+        raise pg.PgCollectionException("Layer {!r} is missing from collection's structure. ")
+    layer_struct = collection.structure[layer_name]
+    layer_type = layer_struct.get('layer_type')
+    layer_table = None
+    if layer_type == 'fragmented': 
+        layer_table = pg.fragment_table_name(collection.name, layer_name)
+    elif layer_type == 'detached': 
+        layer_table = pg.layer_table_name(collection.name, layer_name)
+    else:
+        raise pg.PgCollectionException(f'Cannot drop layer {layer_name!r} index, because the layer is {layer_type}.')
+    assert layer_table is not None
+    assert collection.storage.conn.autocommit == False
+    with collection.storage.conn.cursor() as c:
+        try:
+            if layer_struct.get('relation_layer', False):
+                # Relation layer
+                layer_index_name = 'idx_%s_relations' % layer_table
+                if len(layer_index_name) > 63:
+                    logger.warning(f'Layer index name {layer_index_name!r} exceeds 63 chars and will be truncated. '+\
+                                    'Please use shorter collection and/or layer name. ')
+                c.execute(SQL("DROP INDEX {schema}.{index}").format( \
+                              schema=Identifier(collection.storage.schema), 
+                              index=Identifier(layer_index_name) ))
+                logger.debug(c.query.decode())
+            else:
+                # Span layer
+                layer_index_name = 'idx_%s_spans' % layer_table
+                if len(layer_index_name) > 63:
+                    logger.warning(f'Layer index name {layer_index_name!r} exceeds 63 chars and will be truncated. '+\
+                                    'Please use shorter collection and/or layer name. ')
+                c.execute(SQL("DROP INDEX {schema}.{index}").format( \
+                              schema=Identifier(collection.storage.schema), 
+                              index=Identifier(layer_index_name) ))
+                logger.debug(c.query.decode())
+        except Exception:
+            collection.storage.conn.rollback()
+            raise
+        finally:
+            if collection.storage.conn.status == STATUS_BEGIN:
+                # no exception, transaction in progress
+                collection.storage.conn.commit()
 
 
 # ===================================================================
