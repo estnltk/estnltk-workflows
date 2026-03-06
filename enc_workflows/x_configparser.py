@@ -581,13 +581,9 @@ def validate_database_naming_length_limits( configuration:dict ):
     for table_name in [f'{collection_name}__structure', 
                        f'{collection_name}__metadata', 
                        f'{collection_name}__structure_pkey', 
-                       f'{collection_name}__metadata_pkey', 
-                       f'idx_{collection_name}_layer_data', 
-                       f'idx_{collection_name}_relation_layer_data', 
-                       f'idx_{collection_name}__metadata__text_id', 
-                       f'idx_{collection_name}__metadata__pkey', ]:
+                       f'{collection_name}__metadata_pkey']:
         if len(table_name) > 63:
-            name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+            name_type = 'table' if not table_name.endswith('_pkey') else 'index'
             truncated_name = table_name[:63]
             warnings.warn(f'(!) Collection {name_type} name {table_name!r} exceeds 63 chars and '+\
                           f'will be truncated to {truncated_name!r}. Please use a shorter collection name! ')
@@ -608,13 +604,10 @@ def validate_database_naming_length_limits( configuration:dict ):
             for table_name in [f'{collection_name}__{layer_name}__layer', 
                                f'{collection_name}__{layer_name}__hash', 
                                f'{collection_name}__{layer_name}__ngrams', 
-                               f'{collection_name}__{layer_name}__layer_pkey', 
-                               f'idx_{collection_name}__{layer_name}__layer__text_id', 
-                               f'idx_{collection_name}__{layer_name}__hash__text_id', 
-                               f'idx_{collection_name}__{layer_name}__layer_spans']:
+                               f'{collection_name}__{layer_name}__layer_pkey']:
                 # TODO: check for relation layers ending with '__layer_relations'
                 if len(table_name) > 63:
-                    name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+                    name_type = 'table' if not table_name.endswith('_pkey') else 'index'
                     truncated_name = table_name[:63]
                     warnings.warn(f'(!) Collection layer {name_type} name {table_name!r} exceeds 63 chars and '+\
                                   f'will be truncated to {truncated_name!r}. Please use shorter collection or layer name! ')
@@ -635,13 +628,10 @@ def validate_database_naming_length_limits( configuration:dict ):
                     for table_name in [f'{collection_name}__{layer_name}__layer', 
                                        f'{collection_name}__{layer_name}__hash', 
                                        f'{collection_name}__{layer_name}__ngrams', 
-                                       f'{collection_name}__{layer_name}__layer_pkey', 
-                                       f'idx_{collection_name}__{layer_name}__layer__text_id', 
-                                       f'idx_{collection_name}__{layer_name}__hash__text_id', 
-                                       f'idx_{collection_name}__{layer_name}__layer_spans']:
+                                       f'{collection_name}__{layer_name}__layer_pkey']:
                         # TODO: check for relation layers ending with '__layer_relations'
                         if len(table_name) > 63:
-                            name_type = 'table' if not table_name.startswith('idx_') and not table_name.endswith('_pkey') else 'index'
+                            name_type = 'table' if not table_name.endswith('_pkey') else 'index'
                             truncated_name = table_name[:63]
                             warnings.warn(f'(!) Collection layer {name_type} name {table_name!r} exceeds 63 chars and '+\
                                           f'will be truncated to {truncated_name!r}. Please use shorter collection or layer name! ')
