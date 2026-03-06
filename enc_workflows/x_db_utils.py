@@ -16,7 +16,11 @@ from psycopg2.extensions import STATUS_BEGIN
 from psycopg2.sql import DEFAULT as SQL_DEFAULT
 from psycopg2.sql import SQL, Identifier, Literal, Composed
 
+from packaging.version import Version as pkg_Version
+from packaging.version import parse as parse_version
+
 from estnltk import Text
+from estnltk import __version__ as estnltk_version
 
 from estnltk.converters import text_to_json
 from estnltk.converters import layer_to_json
@@ -40,6 +44,32 @@ from x_utils import rename_layer
 from x_logging import get_logger_with_tqdm_handler
 
 logger = get_logger_with_tqdm_handler()
+
+
+# ===================================================================
+#    Create text_id indexes
+# ===================================================================
+
+def create_text_id_index( collection: 'pg.PgCollection', index_name: str, table_identifier: str ):
+    '''Creates text_id index for the given table.'''
+    conn = collection.storage.conn
+    conn.commit()
+    conn.autocommit = False
+    with conn.cursor() as cur:
+        try:
+            # Add text_id index
+            cur.execute(SQL("CREATE INDEX {index} ON {table_identifier} (text_id);").format(
+                            index = Identifier( index_name ),
+                            table_identifier = table_identifier))
+            logger.debug(cur.query.decode())
+        except Exception as index_creation_error:
+            conn.rollback()
+            raise pg.PgCollectionException("can't create text_id index on {!r}".format(table_identifier)) from index_creation_error
+        finally:
+            if conn.status == STATUS_BEGIN:
+                # no exception, transaction in progress
+                conn.commit()
+
 
 # ===================================================================
 #    Collection's layer tables
@@ -147,6 +177,7 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
     # Create layer tables. Note we need to bypass the standard layer table 
     # creation mechanism, which forbids layer creation on empty collection
     tables_created = 0
+    indexes_to_be_created = []
     for template in layer_templates:
         # Check for the existence of the layer
         if template.name in existing_structure_layers or template.name in existing_filled_layers:
@@ -201,11 +232,9 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
                 cur.execute(q)
                 logger.debug(cur.query.decode())
 
-                cur.execute(SQL(
-                    "CREATE INDEX {index} ON {layer_table} (text_id);").format(
-                    index=Identifier('idx_%s__text_id' % layer_table),
-                    layer_table=layer_identifier))
-                logger.debug(cur.query.decode())
+                # Remember to create a text_id index for this table
+                indexes_to_be_created.append( ('%s__text_id' % layer_table, layer_identifier) )
+
                 tables_created += 1
 
             except Exception as layer_adding_error:
@@ -218,6 +247,16 @@ def create_collection_layer_tables( configuration: dict,  collection: 'pg.PgColl
 
         sparsity_status = 'sparse ' if template.name in sparse_layers else ''
         logger.info('{}{} layer {!r} created from template'.format(sparsity_status, layer_type, template.name))
+    
+    if indexes_to_be_created:
+        if parse_version( estnltk_version ) >= pkg_Version('1.7.5'):
+            # Add text_id indexes to layer tables
+            from estnltk.storage.postgres import get_index_name_hash
+            for (index_name, table_identifier) in indexes_to_be_created:
+                create_text_id_index( collection, get_index_name_hash(index_name), table_identifier )
+        else:
+            logger.warning('(!) Unable to create layer text_id indexes. Please update estnltk to v1.7.5 for index creation.')
+        
     if tables_created > 0:
         logger.info('created {} new layer tables to the collection {!r}'.format(tables_created, collection.name))
     elif update:
@@ -330,11 +369,6 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
             q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
             cur.execute(q)
             logger.debug(cur.query.decode())
-            # Add text_id index to metadata table
-            cur.execute(SQL("CREATE INDEX {index} ON {metadata_table} (text_id);").format(
-                            index = Identifier('idx_%s__text_id' % metadata_table),
-                            metadata_table = table_identifier))
-            logger.debug(cur.query.decode())
         except Exception as table_creation_error:
             conn.rollback()
             raise pg.PgCollectionException("can't create metadata table {!r}".format(metadata_table)) from table_creation_error
@@ -342,6 +376,12 @@ def create_collection_metadata_table( configuration: dict, collection: 'pg.PgCol
             if conn.status == STATUS_BEGIN:
                 # no exception, transaction in progress
                 conn.commit()
+    if parse_version( estnltk_version ) >= pkg_Version('1.7.5'):
+        # Add text_id index to metadata table
+        from estnltk.storage.postgres import get_index_name_hash
+        create_text_id_index( collection, get_index_name_hash('%s__text_id' % metadata_table), table_identifier )
+    else:
+        logger.warning('(!) Unable to create index. Please update estnltk to v1.7.5 for index creation.')
     logger.info('created collection metadata table with meta fields {}'.format(new_meta_fields))
 
 
@@ -466,11 +506,6 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
             q = SQL("COMMENT ON TABLE {} IS {};").format( table_identifier, comment )
             cur.execute(q)
             logger.debug(cur.query.decode())
-            # Add text_id index to sentence hash table
-            cur.execute(SQL("CREATE INDEX {index} ON {sentence_hash_table} (text_id);").format(
-                            index = Identifier('idx_%s__text_id' % sentence_hash_table),
-                            sentence_hash_table = table_identifier))
-            logger.debug(cur.query.decode())
         except Exception as table_creation_error:
             conn.rollback()
             raise pg.PgCollectionException("can't create sentence hash table {!r}".format(sentence_hash_table)) from table_creation_error
@@ -478,6 +513,12 @@ def create_sentence_hash_table( configuration: dict, collection: 'pg.PgCollectio
             if conn.status == STATUS_BEGIN:
                 # no exception, transaction in progress
                 conn.commit()
+    if parse_version( estnltk_version ) >= pkg_Version('1.7.5'):
+        # Add text_id index to sentence hash table
+        from estnltk.storage.postgres import get_index_name_hash
+        create_text_id_index( collection, get_index_name_hash('%s__text_id' % sentence_hash_table), table_identifier )
+    else:
+        logger.warning('(!) Unable to create index. Please update estnltk to v1.7.5 for index creation.')
     logger.info('created collection\'s {} hash table'.format(layer_name))
 
 
@@ -525,6 +566,9 @@ def drop_layer_index( collection: 'pg.PgCollection', layer_name:str ):
         # Note: at this point, the structure should already exist
         # ( created by add_layer(...) function )
         raise pg.PgCollectionException("Layer {!r} is missing from collection's structure. ")
+    if not parse_version( estnltk_version ) >= pkg_Version('1.7.5'):
+        raise pg.PgCollectionException("Please update to estnltk v1.7.5+ to use this drop layer indexes.")
+    from estnltk.storage.postgres import get_index_name_hash
     layer_struct = collection.structure[layer_name]
     layer_type = layer_struct.get('layer_type')
     layer_table = None
@@ -540,7 +584,7 @@ def drop_layer_index( collection: 'pg.PgCollection', layer_name:str ):
         try:
             if layer_struct.get('relation_layer', False):
                 # Relation layer
-                layer_index_name = 'idx_%s_relations' % layer_table
+                layer_index_name = get_index_name_hash('%s_relations' % layer_table)
                 if len(layer_index_name) > 63:
                     logger.warning(f'Layer index name {layer_index_name!r} exceeds 63 chars and will be truncated. '+\
                                     'Please use shorter collection and/or layer name. ')
@@ -550,7 +594,7 @@ def drop_layer_index( collection: 'pg.PgCollection', layer_name:str ):
                 logger.debug(c.query.decode())
             else:
                 # Span layer
-                layer_index_name = 'idx_%s_spans' % layer_table
+                layer_index_name = get_index_name_hash('%s_spans' % layer_table)
                 if len(layer_index_name) > 63:
                     logger.warning(f'Layer index name {layer_index_name!r} exceeds 63 chars and will be truncated. '+\
                                     'Please use shorter collection and/or layer name. ')
