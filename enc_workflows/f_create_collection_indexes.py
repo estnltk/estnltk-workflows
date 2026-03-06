@@ -1,5 +1,5 @@
 #
-#   Creates layer table indexes for the given Postgres' collection. 
+#   Creates table indexes for the given Postgres' collection. 
 #   Indexes are necessary to speed up quering in the database. 
 #
 #   Requires name of a configuration INI file as an input argument. 
