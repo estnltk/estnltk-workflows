@@ -45,10 +45,21 @@ Processing steps:
 
 * `b1_add_syntax_to_json_files.py` -- adds syntactic analyses to (json format) Text objects and creates morphosyntactic layers combining the (input) morphological annotations and newly created syntactic annotations. Name of the collection's configuration is required as an input argument, e.g.
 	* `python  b1_add_syntax_to_json_files.py  confs/literature_old.ini`
-	* By default, overwrites collection's old json files with new ones;
+		* By default, overwrites collection's old json files with new ones;
+	* Creates layer `"morphosyntax"` combining input morphological annotations and syntactic annotations (uses the STANZA ME model from the experiments of [Laur et al. (2025)](https://doi.org/10.1007/s10579-024-09779-z));
 
-* `b2_add_clauses_timexes_names_to_json_files.py` -- **. . .**
-* `b3_add_bert_ner_to_json_files.py` -- **. . .**
+* `b2_add_clauses_timexes_names_to_json_files.py` -- adds clauses, timexes and named entities annotations to (json format) Text objects. Name of the collection's configuration is required as an input argument, e.g.
+	* `python  b2_add_clauses_timexes_names_to_json_files.py  confs/literature_old.ini`
+		* By default, overwrites collection's old json files with new ones;
+	* Creates layer `"clauses"` containing clause boundary annotations [(Kaalep and Muischnek, 2012)](http://www.lrec-conf.org/proceedings/lrec2012/summaries/229.html);
+	* Creates layer `"timexes"` containing temporal expression annotations [(Orasmaa, 2012;](http://dx.doi.org/10.5128/ERYa8.10) [Orasmaa and Kaalep, 2017)](http://www.ep.liu.se/ecp/131/022/ecp17131022.pdf);
+	* Creates layer `"named_entities"` containing named entities tagged via a traditional machine learning based approach [(Tkachenko et al. 2013)](https://aclanthology.org/W13-2412/);
+
+
+* `b3_add_bert_ner_to_json_files.py` -- adds named entities annotations to (json format) Text objects using a Bert like named entity recognition model. Name of the collection's configuration is required as an input argument, e.g.
+	* `python  b3_add_bert_ner_to_json_files.py  confs/literature_old.ini`
+		* By default, overwrites collection's old json files with new ones;
+	* Creates layer `"estbert_named_entities"` containing named entities tagged via [EstBert based model](https://huggingface.co/tartuNLP/EstBERT_NER) [(Tanvir et al. 2020)](https://arxiv.org/pdf/2011.04784);
 
 * `c_write_syntax_to_vert_file.py` -- reads syntactic annotations from EstNLTK's json files and writes into ENC vert files. Requires name of the collection's configuration as an input argument, e.g.
 	* `python  c_write_syntax_to_vert_file.py  confs/literature_old.ini`
