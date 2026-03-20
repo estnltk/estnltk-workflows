@@ -4,7 +4,7 @@ This folder contains workflows for processing the vert format Estonian National 
 
 ---
 
-## Preprocessing and syntactic annotation workflow
+## Preprocessing and annotation workflow
 
 ### Requirements
 
@@ -33,7 +33,9 @@ These scripts were used in a preparatory phase before the main corpus processing
 
 ### Main processing
 
-The main processing involves converting ENC corpus from vert files to JSON format documents, adding syntactic analyses to documents and creating new versions of vert files which also contain syntactic analyses of words.  
+The main processing involves converting ENC corpus from vert files to JSON format documents, adding syntactic analyses to documents and creating new versions of vert files which also contain syntactic analyses of words. 
+In addition to syntactic annotations, JSON format documents can be enriched with clause boundary, temporal expression and named entity annotations. 
+
 The ENC corpus is split into collections for the processing. For each collection, there is a configuration file in the directory [confs/](confs/). 
 A configuration file defines parameters of all processing steps. 
 
