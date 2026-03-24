@@ -1,6 +1,7 @@
 # Workflows for processing Estonian National Corpus 2023
 
-This folder contains workflows for processing the vert format Estonian National Corpus 2023 (_Eesti keele koondkorpus_) with EstNLTK. 
+This folder contains workflows for processing Estonian National Corpus 2023 (_Eesti keele koondkorpus_) with EstNLTK. 
+Here are scripts for: a) converting the vert format corpus files into EsNLTK's JSON documents; b) adding different annotation layers (syntax, clauses, timexes and named entities) to JSON documents, c) inserting JSON documents into a [Postgres database](https://www.postgresql.org/) (and updating the database). 
 
 ---
 
@@ -23,6 +24,7 @@ This folder contains workflows for processing the vert format Estonian National 
 	* `nc21_Web_2021.vert`
 	* `nc23_Web_2023.vert`
 * [estnltk](https://github.com/estnltk/estnltk) ( v1.7.3+ )
+* [estnltk_neural](https://github.com/estnltk_neural/estnltk_neural) ( v1.7.3+ )
 * [stanza](https://stanfordnlp.github.io/stanza/) ( we used version 1.5.0 )
 * [estnltk's stanza's models](https://github.com/estnltk/estnltk/blob/main/tutorials/nlp_pipeline/C_syntax/03_syntactic_analysis_with_stanza.ipynb) ( we used version `"stanza_syntax_2023-01-21"` )
 
