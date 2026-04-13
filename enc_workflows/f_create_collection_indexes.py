@@ -105,10 +105,12 @@ if len(sys.argv) > 1:
                     # Retrieve existing indexes
                     #
                     all_existing_indexes = get_collection_indexes( collection )
-                    detached_layer_indexes = {}
+                    #
+                    # Detect existing text_id, spans and relations indexes
+                    #
+                    # 1) Metadata indexes & sentences hash indexes
                     metadata_textid_index = None
                     sentences_hash_textid_index = None
-                    # Detect existing text_id, spans and relations indexes
                     for (tablename, indexname, indexdef) in all_existing_indexes:
                         tablename_parts = tablename.split('__')
                         # Metadata indexes
@@ -118,24 +120,34 @@ if len(sys.argv) > 1:
                         # Sentences hash indexes
                         if len(tablename_parts) > 2 and tablename_parts[-1]  == 'hash' and \
                            tablename_parts[1] == 'sentences' and indexdef.endswith('(text_id)'):
-                            sentences_hash_textid_index = indexname
-                        # Layer indexes
-                        if len(tablename_parts) > 2 and tablename_parts[-1] == 'layer':
-                            layer = tablename_parts[1]
-                            detached_layer_indexes.setdefault(layer, {'text_id':None, 
-                                                                      'spans':None,
-                                                                      'relations':None})
-                            if indexdef.endswith('(text_id)'):
-                                # Found an index over text_id
-                                detached_layer_indexes[layer]['text_id'] = indexname
-                            elif " gin " in indexdef.lower() and \
-                                 ("data->'spans'" in indexdef.lower() or "data -> 'spans'" in indexdef.lower()) and \
-                                 'jsonb_path_ops' in indexdef.lower():
-                                detached_layer_indexes[layer]['spans'] = indexname
-                            elif " gin " in indexdef.lower() and \
-                                 ("data->'relations'" in indexdef.lower() or "data -> 'relations'" in indexdef.lower()) and \
-                                 'jsonb_path_ops' in indexdef.lower():
-                                detached_layer_indexes[layer]['relations'] = indexname
+                            if 'sentences' in detached_layers:
+                                sentences_hash_textid_index = indexname
+                            else:
+                                # Something fishy here ...
+                                logger.warning(f'"sentences" is not among detached layers ({detached_layers!r}), '+\
+                                               f'although sentences hash index exists for table {tablename!r} ...')
+                    # 2) Layer indexes
+                    detached_layer_indexes = {}
+                    for layer in detached_layers:
+                        # Create empty placeholders for existing indexes
+                        detached_layer_indexes.setdefault(layer, {'text_id':None, 'spans':None, 'relations':None})
+                        # Detect existing indexes
+                        for (tablename, indexname, indexdef) in all_existing_indexes:
+                            tablename_parts = tablename.split('__')
+                            if len(tablename_parts) > 2 and tablename_parts[-1] == 'layer':
+                                indexed_layer = tablename_parts[1]
+                                if layer == indexed_layer:
+                                    if indexdef.endswith('(text_id)'):
+                                        # Found an index over text_id
+                                        detached_layer_indexes[layer]['text_id'] = indexname
+                                    elif " gin " in indexdef.lower() and \
+                                         ("data->'spans'" in indexdef.lower() or "data -> 'spans'" in indexdef.lower()) and \
+                                         'jsonb_path_ops' in indexdef.lower():
+                                        detached_layer_indexes[layer]['spans'] = indexname
+                                    elif " gin " in indexdef.lower() and \
+                                         ("data->'relations'" in indexdef.lower() or "data -> 'relations'" in indexdef.lower()) and \
+                                         'jsonb_path_ops' in indexdef.lower():
+                                        detached_layer_indexes[layer]['relations'] = indexname
                     #
                     # Create missing text_id indexes
                     #
@@ -160,48 +172,46 @@ if len(sys.argv) > 1:
                             indexes_created.setdefault('text_id', 0)
                             indexes_created['text_id'] += 1
                     for layer in detached_layer_indexes.keys():
-                        if layer in detached_layers:
-                            old_textid_index = detached_layer_indexes[layer]['text_id']
-                            if old_textid_index is None:
-                                logger.info(f'Creating text_id index for layer {layer!r} ...')
-                                layer_table = layer_table_name(collection.name, layer)
-                                layer_table_id = pg.table_identifier(collection.storage, layer_table)
-                                create_text_id_index( collection, \
-                                                      get_index_name_hash('%s__text_id' % layer_table), \
-                                                      layer_table_id )
-                                indexes_created.setdefault('text_id', 0)
-                                indexes_created['text_id'] += 1
+                        old_textid_index = detached_layer_indexes[layer]['text_id']
+                        if old_textid_index is None:
+                            logger.info(f'Creating text_id index for layer {layer!r} ...')
+                            layer_table = layer_table_name(collection.name, layer)
+                            layer_table_id = pg.table_identifier(collection.storage, layer_table)
+                            create_text_id_index( collection, \
+                                                  get_index_name_hash('%s__text_id' % layer_table), \
+                                                  layer_table_id )
+                            indexes_created.setdefault('text_id', 0)
+                            indexes_created['text_id'] += 1
                     #
                     # Create layer tables spans/relations indexes
                     #
                     for layer in detached_layer_indexes.keys():
-                        if layer in detached_layers:
-                            if is_relation_layer[layer]:
-                                # Relation layer
-                                old_layer_index = detached_layer_indexes[layer]['relations']
-                                if overwrite_existing and old_layer_index is not None:
-                                    # Remove old index
-                                    logger.info(f'Removing old index from the layer {layer!r} ...')
-                                    drop_layer_index(collection, layer)
-                                    old_layer_index = None
-                                if old_layer_index is None:
-                                    logger.info(f'Creating index for relation layer {layer!r} ...')
-                                    collection.create_layer_index(layer, index_type='data')
-                                    indexes_created.setdefault('relation_layer', 0)
-                                    indexes_created['relation_layer'] += 1
-                            else:
-                                # Span layer
-                                old_layer_index = detached_layer_indexes[layer]['spans']
-                                if overwrite_existing and old_layer_index is not None:
-                                    # Remove old index
-                                    logger.info(f'Removing old index from the layer {layer!r} ...')
-                                    drop_layer_index(collection, layer)
-                                    old_layer_index = None
-                                if old_layer_index is None:
-                                    logger.info(f'Creating index for span layer {layer!r} ...')
-                                    collection.create_layer_index(layer, index_type='data')
-                                    indexes_created.setdefault('span_layer', 0)
-                                    indexes_created['span_layer'] += 1
+                        if is_relation_layer[layer]:
+                            # Relation layer
+                            old_layer_index = detached_layer_indexes[layer]['relations']
+                            if overwrite_existing and old_layer_index is not None:
+                                # Remove old index
+                                logger.info(f'Removing old index from the layer {layer!r} ...')
+                                drop_layer_index(collection, layer)
+                                old_layer_index = None
+                            if old_layer_index is None:
+                                logger.info(f'Creating index for relation layer {layer!r} ...')
+                                collection.create_layer_index(layer, index_type='data')
+                                indexes_created.setdefault('relation_layer', 0)
+                                indexes_created['relation_layer'] += 1
+                        else:
+                            # Span layer
+                            old_layer_index = detached_layer_indexes[layer]['spans']
+                            if overwrite_existing and old_layer_index is not None:
+                                # Remove old index
+                                logger.info(f'Removing old index from the layer {layer!r} ...')
+                                drop_layer_index(collection, layer)
+                                old_layer_index = None
+                            if old_layer_index is None:
+                                logger.info(f'Creating index for span layer {layer!r} ...')
+                                collection.create_layer_index(layer, index_type='data')
+                                indexes_created.setdefault('span_layer', 0)
+                                indexes_created['span_layer'] += 1
                     if len(indexes_created.keys()) > 0:
                         indexes_created_info_str = \
                             ', '.join([f'{v} {k}' for k,v in indexes_created.items()])
