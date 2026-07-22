@@ -22,7 +22,7 @@ import configparser
 from datetime import datetime
 
 from estnltk import logger
-from vabamorfwithberttagger import VabamorfWithBertTagger # TODO: correct this import
+from estnltk_neural.taggers import VabamorfWithBertTagger
 from estnltk.storage.postgres import PostgresStorage
 
 
