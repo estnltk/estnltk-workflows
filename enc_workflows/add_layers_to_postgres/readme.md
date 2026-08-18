@@ -9,7 +9,7 @@ The scripts here are for adding new layers. Continuation of the scirpts in [enc_
 
 This script adds a morph_analysis layer using VabamorfWithBertTagger.
 
-`python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini ` adds new layer tables to an existing collection defined in the ini file. 
+`python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini ` adds new layer tables to an existing collection defined in the ini file. 
 
 
 #### Data parallelization
@@ -19,30 +19,30 @@ For this, use command line parameters `DIVISOR,REMAINDER` (both integers) to tag
 
 Example 1: Launch two separate jobs for tagging `balanced_and_reference_corpus` data:
 
-	$ python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini  2,0
+	$ python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini  2,0
 
 (this tags only texts with id-s: 0, 2, 4, 6, 8, ... )
 
-	$ python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini  2,1
+	$ python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini  2,1
 
 (this tags only texts with id-s: 1, 3, 5, 7, 9, ... )
 
 Example 2: Launch three separate jobs for tagging `balanced_and_reference_corpus` data:
 
-	$ python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini  3,0
+	$ python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini  3,0
 
 (this tags only texts with id-s: 0, 3, 6, 9, 12, ... )
 
-	$ python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini  3,1
+	$ python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini  3,1
 
 (this tags only texts with id-s: 1, 4, 7, 10, 13, ... )
 
-	$ python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini  3,2
+	$ python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini  3,2
 
 (this tags only texts with id-s: 2, 5, 8, 11, 14, ... )
 
 If the process was interrupted, tagging can be continued for the block using `append`.
 
-	$ python  g_add_morph_analysis_layer.py  confs/example_conf_morph_analysis.ini  2,0 append
+	$ python  g_add_morph_with_bert_layer.py  confs/example_conf_morph_with_bert.ini  2,0 append
 
 
