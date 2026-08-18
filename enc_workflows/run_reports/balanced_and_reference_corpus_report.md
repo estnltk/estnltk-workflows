@@ -18,6 +18,7 @@ The corpus was processed with the conf files provided in the workflow and had th
 - morphosyntax_v2024_06
 - ner_v2025_12
 - timexes_v2025_12
+- sentences
 - words	
 
 
