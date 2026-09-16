@@ -96,7 +96,7 @@ In this way, you can launch a separate instance of `c_write_syntax_to_vert_file.
 ### Requirements
 
 * [**Psycopg 2**](https://www.psycopg.org) (installation: `pip install psycopg2-binary`)
-* [estnltk](https://github.com/estnltk/estnltk) ( v1.7.3+ )
+* [estnltk](https://github.com/estnltk/estnltk) ( v1.7.5+ )
 
 ### Setup and configuration
 
