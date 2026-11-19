@@ -42,6 +42,8 @@ For tagging a layer, you need the following configurations:
 
 * `02_add_timexes_layer.py` -- adds timexes layer with EstNLTK's TimexTagger. Note that this script uses Koondkorpus-specific logic for finding document creation times required for normalization of relative dates (for details, see the module `document_creation_times.py`).
 
+* `03_create_layer_index.py` -- creates a missing GIN index after a detached layer has been filled. Supports span and relation layers.
+
 Note: all 01-02 scripts create detached layers.
 
 ### Data parallelization
