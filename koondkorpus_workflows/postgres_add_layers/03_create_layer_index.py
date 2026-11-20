@@ -3,7 +3,7 @@
 #  Command line arguments:
 #  * CONFIGURATION_INI -- name of the configuration INI file, provides info about:
 #                         [database] -> (schema, role, pgpass_file(optional)),
-#                         [layer]    -> (collection, name)
+#                         [tagger]   -> (collection, output_layer)
 #  * PGPASS_FILE(optional) -- pgpass file providing "host:port:dbname:user:password".
 #                             this will be overridden by pgpass_file from INI file.
 #
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     if len(config.read(config_file_full, encoding='utf-8')) != 1:
         raise ValueError('File {} is not accessible or is not in valid INI format'.format(config_file_full))
     for section_name, options in [('database', ['schema', 'role']),
-                                  ('layer', ['collection', 'name'])]:
+                                  ('tagger', ['collection', 'output_layer'])]:
         if not config.has_section(section_name):
             raise ValueError('Error in file {}: missing section [{}]'.format(config_file_full, section_name))
         for option in options:
@@ -77,9 +77,9 @@ if __name__ == '__main__':
                               schema=config['database']['schema'],
                               role=config['database']['role'])
     try:
-        target_collection = config['layer']['collection']
+        target_collection = config['tagger']['collection']
         collection = storage[target_collection]
-        layer_name = config['layer']['name']
+        layer_name = config['tagger']['output_layer']
         if collection.structure[layer_name]['layer_type'] != 'detached':
             raise ValueError('Expected a detached layer: {!r}.'.format(layer_name))
 
